@@ -14,7 +14,7 @@ app.innerHTML = `
       </div>
       <div class="walletBox">
         <button id="connectBtn" class="primary">Connect Wallet</button>
-        <p id="walletStatus" class="muted">Start on Base Sepolia. Mainnet only after testing.</p>
+        <p id="walletStatus" class="muted">Live on Base Mainnet. Play, unlock milestones, and mint NFT badges.</p>
       </div>
     </section>
 
@@ -44,16 +44,16 @@ app.innerHTML = `
     </section>
 
     <section class="card info">
-      <h2>Milestones</h2>
-      <div class="milestones">
-        <div><b>1</b><span>Rookie Runner</span><em>1,200 score</em></div>
-        <div><b>2</b><span>Chain Jumper</span><em>2,600 score</em></div>
-        <div><b>3</b><span>Base Sprinter</span><em>4,500 score</em></div>
-        <div><b>4</b><span>Gasless Ghost</span><em>7,000 score</em></div>
-        <div><b>5</b><span>Block Master</span><em>10,000 score</em></div>
-        <div><b>6</b><span>Onchain Legend</span><em>13,500 score</em></div>
-      </div>
-    </section>
+  <h2>Milestones</h2>
+  <div class="milestones">
+    <div><b>1</b><span>Rookie Runner</span><em>1,200 score • 20s</em></div>
+    <div><b>2</b><span>Chain Jumper</span><em>5,000 score • 10s</em></div>
+    <div><b>3</b><span>Base Sprinter</span><em>10,000 score • 10s</em></div>
+    <div><b>4</b><span>Gasless Ghost</span><em>15,000 score • 10s</em></div>
+    <div><b>5</b><span>Block Master</span><em>22,000 score • 15s</em></div>
+    <div><b>6</b><span>Onchain Legend</span><em>30,000 score • 17s</em></div>
+  </div>
+</section>
   </main>
 `;
 
