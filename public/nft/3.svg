@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset="0.55" stop-color="#173b72"/>
+      <stop offset="1" stop-color="#07111f"/>
+    </linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="12" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="1200" height="1200" fill="url(#bg)"/>
+  <circle cx="600" cy="600" r="380" fill="none" stroke="#ffd166" stroke-width="28" opacity=".72" filter="url(#glow)"/>
+  <path d="M305 730 L510 355 L690 610 L805 455 L920 730 Z" fill="#ffd166" opacity=".92"/>
+  <rect x="250" y="795" width="700" height="24" rx="12" fill="#ffffff" opacity=".82"/>
+  <text x="600" y="165" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="62" font-weight="800" fill="#ffffff">BASE QUEST</text>
+  <text x="600" y="1010" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="54" font-weight="900" fill="#ffffff">MILESTONE 3</text>
+  <text x="600" y="1080" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="42" font-weight="700" fill="#ffd166">Base Sprinter</text>
+</svg>

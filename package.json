@@ -1,0 +1,26 @@
+{
+  "name": "base-quest-milestones",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A secure no-server Base NFT milestone runner game built with Vite, Canvas, ethers and ERC-721.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:base-sepolia": "hardhat run scripts/deploy.js --network baseSepolia",
+    "deploy:base-mainnet": "hardhat run scripts/deploy.js --network baseMainnet"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2",
+    "ethers": "^6.13.5",
+    "vite": "^5.4.11"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^3.0.8",
+    "dotenv": "^16.4.7",
+    "hardhat": "^2.22.18"
+  }
+}

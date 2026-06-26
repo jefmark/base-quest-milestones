@@ -1,0 +1,19 @@
+{
+  "name": "Base Quest Milestone 5: Block Master",
+  "description": "A no-server onchain milestone NFT earned in Base Quest Milestones. This NFT is a gameplay badge, not a promise of financial reward.",
+  "image": "https://YOUR_USERNAME.github.io/base-quest-milestones/nft/5.svg",
+  "attributes": [
+    {
+      "trait_type": "Game",
+      "value": "Base Quest Milestones"
+    },
+    {
+      "trait_type": "Milestone",
+      "value": "5"
+    },
+    {
+      "trait_type": "Title",
+      "value": "Block Master"
+    }
+  ]
+}

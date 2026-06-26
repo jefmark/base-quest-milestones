@@ -1,0 +1,19 @@
+{
+  "name": "Base Quest Milestone 1: Rookie Runner",
+  "description": "A no-server onchain milestone NFT earned in Base Quest Milestones. This NFT is a gameplay badge, not a promise of financial reward.",
+  "image": "https://YOUR_USERNAME.github.io/base-quest-milestones/nft/1.svg",
+  "attributes": [
+    {
+      "trait_type": "Game",
+      "value": "Base Quest Milestones"
+    },
+    {
+      "trait_type": "Milestone",
+      "value": "1"
+    },
+    {
+      "trait_type": "Title",
+      "value": "Rookie Runner"
+    }
+  ]
+}

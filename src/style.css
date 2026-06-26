@@ -1,0 +1,55 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #07111f;
+  color: #f5fbff;
+  --card: rgba(15, 29, 51, .78);
+  --line: rgba(255,255,255,.12);
+  --text: #f5fbff;
+  --muted: #a5b8cb;
+  --blue: #3d8bff;
+  --cyan: #26d9d0;
+  --gold: #ffd166;
+  --danger: #ff6b6b;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top left, #173b72, transparent 40%), #07111f; }
+button { font: inherit; border: 0; border-radius: 14px; padding: 12px 16px; background: #1b2c48; color: var(--text); cursor: pointer; transition: transform .15s ease, opacity .15s ease, background .15s ease; }
+button:hover { transform: translateY(-1px); background: #24395b; }
+button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+button.primary { background: linear-gradient(135deg, var(--blue), #5dd6ff); color: white; font-weight: 800; }
+button.accent { background: linear-gradient(135deg, var(--cyan), var(--gold)); color: #06101f; font-weight: 900; }
+code { background: rgba(255,255,255,.08); padding: 2px 6px; border-radius: 7px; }
+a { color: var(--gold); }
+.shell { width: min(1180px, calc(100vw - 28px)); margin: 28px auto; display: grid; gap: 18px; }
+.card { border: 1px solid var(--line); background: var(--card); backdrop-filter: blur(18px); box-shadow: 0 24px 70px rgba(0,0,0,.25); border-radius: 26px; }
+.hero { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 28px; }
+.eyebrow { margin: 0 0 8px; color: var(--cyan); text-transform: uppercase; letter-spacing: .18em; font-size: 12px; font-weight: 900; }
+h1 { margin: 0; font-size: clamp(34px, 6vw, 62px); line-height: .95; }
+h2 { margin: 0 0 16px; }
+.lead { margin: 12px 0 0; max-width: 680px; color: var(--muted); font-size: 17px; line-height: 1.6; }
+.walletBox { display: grid; gap: 10px; justify-items: end; min-width: 230px; }
+.muted { color: var(--muted); margin: 0; font-size: 13px; text-align: right; }
+.gameGrid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; }
+.gameCard { padding: 14px; }
+canvas { width: 100%; height: min(62vh, 540px); min-height: 360px; display: block; border-radius: 18px; border: 1px solid var(--line); background: #0b1425; touch-action: manipulation; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.stats { padding: 22px; }
+dl { display: grid; gap: 10px; margin: 0; }
+dl div { display: flex; justify-content: space-between; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--line); }
+dt { color: var(--muted); }
+dd { margin: 0; font-weight: 900; }
+.message { margin-top: 18px; padding: 14px; border-radius: 16px; background: rgba(38,217,208,.09); color: #d8fffb; line-height: 1.5; }
+.securityNote { margin-top: 14px; color: var(--muted); line-height: 1.55; font-size: 13px; }
+.info { padding: 22px; }
+.milestones { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.milestones div { padding: 14px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.05); display: grid; gap: 6px; }
+.milestones b { width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; background: rgba(61,139,255,.25); }
+.milestones span { font-weight: 900; }
+.milestones em { color: var(--muted); font-style: normal; font-size: 13px; }
+@media (max-width: 880px) {
+  .hero, .gameGrid { grid-template-columns: 1fr; display: grid; }
+  .walletBox { justify-items: start; }
+  .muted { text-align: left; }
+  .milestones { grid-template-columns: repeat(2, 1fr); }
+}
