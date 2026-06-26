@@ -1,10 +1,10 @@
 const STAGE_CONFIG = [
-  { milestone: 1, name: 'Rookie Runner', score: 1200, speed: 5.4 },
-  { milestone: 2, name: 'Chain Jumper', score: 2600, speed: 6.2 },
-  { milestone: 3, name: 'Base Sprinter', score: 4500, speed: 7.0 },
-  { milestone: 4, name: 'Gasless Ghost', score: 7000, speed: 7.9 },
-  { milestone: 5, name: 'Block Master', score: 10000, speed: 8.9 },
-  { milestone: 6, name: 'Onchain Legend', score: 13500, speed: 10.0 },
+  { milestone: 1, name: 'Rookie Runner', score: 1200, minPlaySeconds: 20, speed: 5.4 },
+  { milestone: 2, name: 'Chain Jumper', score: 5000, minPlaySeconds: 10, speed: 6.2 },
+  { milestone: 3, name: 'Base Sprinter', score: 10000, minPlaySeconds: 10, speed: 7.0 },
+  { milestone: 4, name: 'Gasless Ghost', score: 15000, minPlaySeconds: 10, speed: 7.9 },
+  { milestone: 5, name: 'Block Master', score: 22000, minPlaySeconds: 15, speed: 8.9 },
+  { milestone: 6, name: 'Onchain Legend', score: 30000, minPlaySeconds: 17, speed: 10.0 },
 ];
 
 const safeRandom = (min, max) => Math.random() * (max - min) + min;
