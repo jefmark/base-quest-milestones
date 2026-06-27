@@ -1,9 +1,18 @@
 import './style.css';
 import { CONFIG } from './config.js';
-import { createGame } from './game.js';
+import { createGame, STAGE_CONFIG } from './game.js';
 import { connectWallet, getBalanceText, mintMilestone, shortAddress, walletState } from './wallet.js';
 
 const app = document.querySelector('#app');
+
+const milestoneCards = STAGE_CONFIG.map((m) => `
+  <div>
+    <b>${m.milestone}</b>
+    <span>${m.name}</span>
+    <em>${m.score.toLocaleString()} score • ${m.minPlaySeconds}s</em>
+  </div>
+`).join('');
+
 app.innerHTML = `
   <main class="shell">
     <section class="hero card">
@@ -14,7 +23,7 @@ app.innerHTML = `
       </div>
       <div class="walletBox">
         <button id="connectBtn" class="primary">Connect Wallet</button>
-        <p id="walletStatus" class="muted">Live on Base Mainnet. Play, unlock milestones, and mint NFT badges.</p>
+        <p id="walletStatus" class="muted">Live on Base Mainnet. Play, score, and mint milestone NFT badges.</p>
       </div>
     </section>
 
@@ -24,7 +33,7 @@ app.innerHTML = `
         <div class="controls">
           <button id="startBtn">Start / Restart</button>
           <button id="jumpBtn">Jump</button>
-          <button id="mintBtn" class="accent" disabled>Mint Unlocked NFT</button>
+          <button id="mintBtn" class="accent" disabled>Mint NFT</button>
         </div>
       </div>
       <aside class="card stats">
@@ -33,8 +42,10 @@ app.innerHTML = `
           <div><dt>Score</dt><dd id="score">0</dd></div>
           <div><dt>Best</dt><dd id="best">0</dd></div>
           <div><dt>Stage</dt><dd id="stage">Rookie Runner</dd></div>
-          <div><dt>Unlocked NFT</dt><dd id="unlocked">None</dd></div>
+          <div><dt>Score Unlocked</dt><dd id="unlocked">None</dd></div>
+          <div><dt>Mintable NFT</dt><dd id="mintable">None</dd></div>
           <div><dt>Play Time</dt><dd id="seconds">0s</dd></div>
+          <div><dt>Next Requirement</dt><dd id="requirement">1,200 score • 20s</dd></div>
         </dl>
         <div id="message" class="message">Press Space, tap the game, or use Jump.</div>
         <div class="securityNote">
@@ -44,16 +55,11 @@ app.innerHTML = `
     </section>
 
     <section class="card info">
-  <h2>Milestones</h2>
-  <div class="milestones">
-    <div><b>1</b><span>Rookie Runner</span><em>1,200 score • 20s</em></div>
-    <div><b>2</b><span>Chain Jumper</span><em>5,000 score • 10s</em></div>
-    <div><b>3</b><span>Base Sprinter</span><em>10,000 score • 10s</em></div>
-    <div><b>4</b><span>Gasless Ghost</span><em>15,000 score • 10s</em></div>
-    <div><b>5</b><span>Block Master</span><em>22,000 score • 15s</em></div>
-    <div><b>6</b><span>Onchain Legend</span><em>30,000 score • 17s</em></div>
-  </div>
-</section>
+      <h2>Milestones</h2>
+      <div class="milestones">
+        ${milestoneCards}
+      </div>
+    </section>
   </main>
 `;
 
@@ -62,7 +68,9 @@ const scoreEl = $('#score');
 const bestEl = $('#best');
 const stageEl = $('#stage');
 const unlockedEl = $('#unlocked');
+const mintableEl = $('#mintable');
 const secondsEl = $('#seconds');
+const requirementEl = $('#requirement');
 const messageEl = $('#message');
 const mintBtn = $('#mintBtn');
 const connectBtn = $('#connectBtn');
@@ -70,26 +78,72 @@ const walletStatus = $('#walletStatus');
 
 let lastSnapshot = null;
 
+function milestoneLabel(milestone) {
+  if (!milestone) return 'None';
+  return `#${milestone.milestone} ${milestone.name}`;
+}
+
+function requirementText(snapshot) {
+  const next = snapshot.nextRequirement;
+
+  if (!next) {
+    return 'All milestones unlocked';
+  }
+
+  const missing = [];
+  if (next.remainingScore > 0) missing.push(`${next.remainingScore.toLocaleString()} more score`);
+  if (next.remainingSeconds > 0) missing.push(`${next.remainingSeconds}s more play time`);
+
+  return `#${next.milestone} ${next.name}: ${next.score.toLocaleString()} score • ${next.minPlaySeconds}s${missing.length ? ` (${missing.join(' + ')})` : ''}`;
+}
+
+function updateMintButton(snapshot) {
+  const mintable = snapshot?.mintableMilestone;
+  const canMint = Boolean(CONFIG.contractAddress && walletState.account && mintable);
+
+  mintBtn.disabled = !canMint;
+
+  if (mintable) {
+    mintBtn.textContent = `Mint #${mintable.milestone} ${mintable.name}`;
+  } else {
+    mintBtn.textContent = 'Mint NFT Locked';
+  }
+}
+
 const game = createGame($('#gameCanvas'), {
   onUpdate: updateStats,
   onMilestone(snapshot) {
     updateStats(snapshot);
-    messageEl.textContent = `Milestone ${snapshot.milestoneUnlocked} unlocked. You can mint this NFT after connecting your wallet.`;
   },
   onGameOver(snapshot) {
     updateStats(snapshot);
-    messageEl.textContent = 'Game over. Restart and try to unlock a higher milestone.';
+
+    if (snapshot.mintableMilestone) {
+      messageEl.textContent = `${milestoneLabel(snapshot.mintableMilestone)} is ready to mint. Play time: ${snapshot.playSeconds}s.`;
+    } else {
+      messageEl.textContent = `Game over. NFT mint is locked. ${requirementText(snapshot)}`;
+    }
   }
 });
 
 function updateStats(snapshot) {
   lastSnapshot = snapshot;
+
   scoreEl.textContent = snapshot.score.toLocaleString();
   bestEl.textContent = snapshot.best.toLocaleString();
   stageEl.textContent = snapshot.stage?.name || 'Rookie Runner';
-  unlockedEl.textContent = snapshot.milestoneUnlocked ? `Milestone ${snapshot.milestoneUnlocked}` : 'None';
+  unlockedEl.textContent = milestoneLabel(snapshot.scoreUnlockedMilestone);
+  mintableEl.textContent = milestoneLabel(snapshot.mintableMilestone);
   secondsEl.textContent = `${snapshot.playSeconds}s`;
-  mintBtn.disabled = !CONFIG.contractAddress || !walletState.account || !snapshot.milestoneUnlocked;
+  requirementEl.textContent = requirementText(snapshot);
+
+  updateMintButton(snapshot);
+
+  if (snapshot.mintableMilestone) {
+    messageEl.textContent = `${milestoneLabel(snapshot.mintableMilestone)} is mintable now. Play time: ${snapshot.playSeconds}s.`;
+  } else if (snapshot.scoreUnlockedMilestone) {
+    messageEl.textContent = `Score reached for ${milestoneLabel(snapshot.scoreUnlockedMilestone)}, but mint is still locked. ${requirementText(snapshot)}`;
+  }
 }
 
 $('#startBtn').addEventListener('click', () => game.start());
@@ -102,8 +156,8 @@ connectBtn.addEventListener('click', async () => {
     connectBtn.textContent = shortAddress(walletState.account);
     walletStatus.textContent = `${CONFIG.chainName} connected • ${balance}`;
     messageEl.textContent = CONFIG.contractAddress
-      ? 'Wallet connected. Play and mint your unlocked milestone.'
-      : 'Wallet connected, but VITE_CONTRACT_ADDRESS is empty. Deploy the contract and add the address.';
+      ? 'Wallet connected. Play until score and time conditions are met.'
+      : 'Wallet connected, but VITE_CONTRACT_ADDRESS is empty. Add the contract address.';
     updateStats(lastSnapshot || game.snapshot());
   } catch (err) {
     console.error(err);
@@ -113,10 +167,21 @@ connectBtn.addEventListener('click', async () => {
 
 mintBtn.addEventListener('click', async () => {
   try {
-    if (!lastSnapshot?.milestoneUnlocked) throw new Error('Unlock a milestone first.');
+    const mintable = lastSnapshot?.mintableMilestone;
+
+    if (!mintable) {
+      throw new Error('No NFT is mintable yet. Reach the required score and play time first.');
+    }
+
     mintBtn.disabled = true;
-    messageEl.textContent = 'Mint transaction sent. Confirm only if it calls mintMilestone and asks for gas only.';
-    const result = await mintMilestone(lastSnapshot.milestoneUnlocked, lastSnapshot.score, lastSnapshot.playSeconds);
+    messageEl.textContent = `Minting #${mintable.milestone} ${mintable.name}. Confirm only if it calls mintMilestone and asks for gas only.`;
+
+    const result = await mintMilestone(
+      mintable.milestone,
+      lastSnapshot.score,
+      lastSnapshot.playSeconds
+    );
+
     messageEl.innerHTML = `NFT minted. <a href="${CONFIG.explorerUrl}/tx/${result.hash}" target="_blank" rel="noreferrer">View transaction</a>`;
   } catch (err) {
     console.error(err);
@@ -127,5 +192,5 @@ mintBtn.addEventListener('click', async () => {
 });
 
 if (!CONFIG.contractAddress) {
-  messageEl.textContent = 'Contract not configured yet. Deploy on Base Sepolia first, then add VITE_CONTRACT_ADDRESS.';
+  messageEl.textContent = 'Contract not configured yet. Add VITE_CONTRACT_ADDRESS in GitHub/Vercel variables.';
 }
