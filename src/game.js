@@ -7,8 +7,114 @@ export const STAGE_CONFIG = [
   { milestone: 6, name: 'Onchain Legend', score: 30000, minPlaySeconds: 17, speed: 10.0 },
 ];
 
+export const PENALTY_CONFIG = [
+  { label: '0-20s', until: 20, penalty: 200 },
+  { label: '20-30s', until: 30, penalty: 300 },
+  { label: '30-40s', until: 40, penalty: 500 },
+  { label: '40-50s', until: 50, penalty: 750 },
+  { label: '50-65s', until: 65, penalty: 1200 },
+  { label: '65-82s', until: 82, penalty: 2000 },
+  { label: '82s+', until: Number.POSITIVE_INFINITY, penalty: 5000 },
+];
+
+export const FINAL_REPEAT_SECONDS = 10;
+
 const safeRandom = (min, max) => Math.random() * (max - min) + min;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+
+// Soft procedural audio. No audio files needed; sounds are generated safely in the browser.
+let audioCtx = null;
+let soundEnabled = localStorage.getItem('baseQuestSound') !== 'off';
+
+function getAudioCtx() {
+  if (!soundEnabled) return null;
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+  if (!audioCtx) audioCtx = new AudioContextClass();
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  return audioCtx;
+}
+
+function setSoundEnabled(value) {
+  soundEnabled = Boolean(value);
+  localStorage.setItem('baseQuestSound', soundEnabled ? 'on' : 'off');
+  if (!soundEnabled && audioCtx) audioCtx.suspend().catch(() => {});
+  if (soundEnabled) getAudioCtx();
+}
+
+function isSoundEnabled() {
+  return soundEnabled;
+}
+
+function softTone({ frequency = 440, endFrequency = null, delay = 0, duration = 0.18, type = 'sine', volume = 0.035 }) {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+
+  const start = ctx.currentTime + delay;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+
+  osc.type = type;
+  osc.frequency.setValueAtTime(frequency, start);
+  if (endFrequency) osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFrequency), start + duration);
+
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(2200, start);
+  filter.Q.setValueAtTime(0.4, start);
+
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.linearRampToValueAtTime(volume, start + 0.025);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(start);
+  osc.stop(start + duration + 0.04);
+}
+
+function playSound(kind, stage = null) {
+  if (!soundEnabled) return;
+
+  if (kind === 'jump') {
+    // Gentle upward motion sound.
+    softTone({ frequency: 230, endFrequency: 360, duration: 0.16, type: 'sine', volume: 0.032 });
+    softTone({ frequency: 520, delay: 0.035, duration: 0.11, type: 'triangle', volume: 0.018 });
+    return;
+  }
+
+  if (kind === 'orb') {
+    // Soft green-shield pickup chime.
+    softTone({ frequency: 520, duration: 0.12, type: 'sine', volume: 0.028 });
+    softTone({ frequency: 700, delay: 0.08, duration: 0.14, type: 'sine', volume: 0.026 });
+    softTone({ frequency: 930, delay: 0.16, duration: 0.18, type: 'triangle', volume: 0.018 });
+    return;
+  }
+
+  if (kind === 'protectedHit') {
+    // Soft shield impact: muted thud + small shimmer, not harsh.
+    softTone({ frequency: 150, endFrequency: 92, duration: 0.20, type: 'triangle', volume: 0.045 });
+    softTone({ frequency: 420, delay: 0.04, duration: 0.14, type: 'sine', volume: 0.018 });
+    softTone({ frequency: 610, delay: 0.11, duration: 0.16, type: 'sine', volume: 0.014 });
+    return;
+  }
+
+  if (kind === 'gameOver') {
+    // Different gentle end sound by current stage.
+    const milestone = Number(stage?.milestone || 1);
+    const root = [174, 196, 220, 247, 277, 311][Math.max(0, Math.min(5, milestone - 1))];
+    softTone({ frequency: root * 1.4, endFrequency: root, duration: 0.22, type: 'sine', volume: 0.035 });
+    softTone({ frequency: root, endFrequency: root * 0.74, delay: 0.18, duration: 0.24, type: 'triangle', volume: 0.032 });
+    softTone({ frequency: root * 0.56, delay: 0.42, duration: 0.30, type: 'sine', volume: 0.022 });
+  }
+}
+
+export function getPenaltyForSeconds(seconds) {
+  return PENALTY_CONFIG.find((row) => seconds < row.until) || PENALTY_CONFIG[PENALTY_CONFIG.length - 1];
+}
 
 export function createGame(canvas, callbacks = {}) {
   const ctx = canvas.getContext('2d');
@@ -24,10 +130,12 @@ export function createGame(canvas, callbacks = {}) {
     milestoneUnlocked: 0,
     distance: 0,
     shake: 0,
+    lastPenalty: 0,
     player: { x: 90, y: 0, w: 34, h: 42, vy: 0, grounded: false, shield: 0 },
     obstacles: [],
     orbs: [],
     particles: [],
+    damageTexts: [],
     keys: new Set(),
   };
 
@@ -54,10 +162,12 @@ export function createGame(canvas, callbacks = {}) {
     state.milestoneUnlocked = 0;
     state.distance = 0;
     state.shake = 0;
+    state.lastPenalty = 0;
     state.player = { x: 90, y: groundY() - 42, w: 34, h: 42, vy: 0, grounded: true, shield: 0 };
     state.obstacles = [];
     state.orbs = [];
     state.particles = [];
+    state.damageTexts = [];
     callbacks.onUpdate?.(snapshot());
   }
 
@@ -102,6 +212,7 @@ export function createGame(canvas, callbacks = {}) {
     const playSeconds = getPlaySeconds();
     const scoreUnlocked = getHighestScoreMilestone();
     const mintable = getMintableMilestone();
+    const penaltyWindow = getPenaltyForSeconds(playSeconds);
 
     return {
       score: Math.floor(state.score),
@@ -112,6 +223,10 @@ export function createGame(canvas, callbacks = {}) {
       nextRequirement: getNextRequirement(),
       stage: STAGE_CONFIG[state.stageIndex],
       playSeconds,
+      currentPenalty: penaltyWindow.penalty,
+      penaltyWindow,
+      lastPenalty: state.lastPenalty,
+      shieldActive: state.player.shield > 0,
       running: state.running,
     };
   }
@@ -122,18 +237,51 @@ export function createGame(canvas, callbacks = {}) {
       state.player.vy = -15.2;
       state.player.grounded = false;
       burst(state.player.x + 15, state.player.y + 36, 8);
+      playSound('jump');
     }
   }
 
-  function burst(x, y, count = 12) {
+  function burst(x, y, count = 12, color = '#e0fbfc') {
     for (let i = 0; i < count; i++) {
       state.particles.push({
         x, y,
         vx: safeRandom(-3, 3),
         vy: safeRandom(-4, 2),
         life: safeRandom(18, 36),
+        color,
       });
     }
+  }
+
+  function showPenaltyText(amount) {
+    const px = state.player.x + state.player.w / 2;
+    const py = state.player.y + state.player.h / 2;
+    const direction = Math.random() > 0.5 ? 1 : -1;
+    state.damageTexts.push({
+      text: `-${amount}`,
+      x: px,
+      y: py,
+      vx: safeRandom(1.8, 4.4) * direction,
+      vy: safeRandom(-5.2, -3.2),
+      life: 72,
+      maxLife: 72,
+      size: safeRandom(20, 27),
+      rotation: safeRandom(-0.18, 0.18),
+    });
+  }
+
+  function applyProtectedHitPenalty() {
+    const seconds = getPlaySeconds();
+    const row = getPenaltyForSeconds(seconds);
+    const amount = row.penalty;
+
+    state.score = Math.max(0, state.score - amount);
+    state.lastPenalty = amount;
+    state.shake = 9;
+    showPenaltyText(amount);
+    playSound('protectedHit');
+    burst(state.player.x + 18, state.player.y + 20, 18, '#26d9d0');
+    callbacks.onPenalty?.(snapshot(), amount, row);
   }
 
   function spawnObstacle() {
@@ -144,6 +292,7 @@ export function createGame(canvas, callbacks = {}) {
       w: safeRandom(26, 44),
       h,
       passed: false,
+      hit: false,
     });
   }
 
@@ -151,7 +300,7 @@ export function createGame(canvas, callbacks = {}) {
     state.orbs.push({
       x: canvas.getBoundingClientRect().width + 30,
       y: safeRandom(groundY() - 160, groundY() - 70),
-      r: 11,
+      r: 12,
       taken: false,
       pulse: 0,
     });
@@ -173,6 +322,7 @@ export function createGame(canvas, callbacks = {}) {
     state.endedAt = performance.now();
     state.running = false;
     state.shake = 18;
+    playSound('gameOver', STAGE_CONFIG[state.stageIndex]);
     if (state.score > state.best) {
       state.best = state.score;
       localStorage.setItem('baseQuestBest', String(Math.floor(state.best)));
@@ -187,7 +337,6 @@ export function createGame(canvas, callbacks = {}) {
     if (!state.running || state.paused) return;
     const stage = STAGE_CONFIG[state.stageIndex];
     const speed = stage.speed + Math.min(4, state.distance / 5000);
-    const width = canvas.getBoundingClientRect().width;
 
     state.distance += speed * dt;
     state.score += speed * dt * 0.9;
@@ -206,7 +355,7 @@ export function createGame(canvas, callbacks = {}) {
     }
     if (orbTimer <= 0) {
       spawnOrb();
-      orbTimer = safeRandom(45, 85);
+      orbTimer = safeRandom(42, 80);
     }
 
     for (const o of state.obstacles) {
@@ -215,11 +364,12 @@ export function createGame(canvas, callbacks = {}) {
         o.passed = true;
         state.score += 45;
       }
-      if (rectHit(state.player, o)) {
+      if (!o.hit && rectHit(state.player, o)) {
+        o.hit = true;
         if (state.player.shield > 0) {
           o.x = -999;
           state.player.shield = 0;
-          burst(state.player.x + 18, state.player.y + 20, 16);
+          applyProtectedHitPenalty();
         } else {
           endGame();
         }
@@ -232,13 +382,15 @@ export function createGame(canvas, callbacks = {}) {
       if (!orb.taken && orbHit(state.player, orb)) {
         orb.taken = true;
         state.score += 120;
-        state.player.shield = Math.max(state.player.shield, 90);
-        burst(orb.x, orb.y, 14);
+        state.player.shield = Math.max(state.player.shield, 120);
+        burst(orb.x, orb.y, 14, '#8cffcb');
+        playSound('orb');
       }
     }
 
     state.obstacles = state.obstacles.filter(o => o.x > -80);
     state.orbs = state.orbs.filter(o => o.x > -80 && !o.taken);
+
     for (const p of state.particles) {
       p.x += p.vx * dt;
       p.y += p.vy * dt;
@@ -246,6 +398,14 @@ export function createGame(canvas, callbacks = {}) {
       p.life -= dt;
     }
     state.particles = state.particles.filter(p => p.life > 0);
+
+    for (const d of state.damageTexts) {
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      d.vy -= 0.02 * dt;
+      d.life -= dt;
+    }
+    state.damageTexts = state.damageTexts.filter(d => d.life > 0);
 
     const nextStage = STAGE_CONFIG.findIndex(s => state.score < s.score);
     const newStageIndex = nextStage === -1 ? STAGE_CONFIG.length - 1 : Math.max(0, nextStage);
@@ -304,11 +464,14 @@ export function createGame(canvas, callbacks = {}) {
       ctx.translate(orb.x, orb.y);
       const scale = 1 + Math.sin(orb.pulse) * 0.08;
       ctx.scale(scale, scale);
-      ctx.fillStyle = '#ffd166';
+      ctx.fillStyle = '#22c55e';
       ctx.beginPath();
       ctx.arc(0, 0, orb.r, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#fff3b0';
+      ctx.strokeStyle = 'rgba(190, 255, 220, .85)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.fillStyle = '#d1fae5';
       ctx.beginPath();
       ctx.arc(-3, -3, 4, 0, Math.PI * 2);
       ctx.fill();
@@ -329,19 +492,27 @@ export function createGame(canvas, callbacks = {}) {
 
     for (const p of state.particles) {
       ctx.globalAlpha = clamp(p.life / 36, 0, 1);
-      ctx.fillStyle = '#e0fbfc';
+      ctx.fillStyle = p.color || '#e0fbfc';
       ctx.fillRect(p.x, p.y, 3, 3);
     }
     ctx.globalAlpha = 1;
 
     const player = state.player;
     if (player.shield > 0) {
-      ctx.strokeStyle = 'rgba(38, 217, 208, .82)';
-      ctx.lineWidth = 3;
+      const pulse = 34 + Math.sin(performance.now() / 110) * 3;
+      ctx.strokeStyle = 'rgba(34, 197, 94, .88)';
+      ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.arc(player.x + player.w / 2, player.y + player.h / 2, 34, 0, Math.PI * 2);
+      ctx.arc(player.x + player.w / 2, player.y + player.h / 2, pulse, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.globalAlpha = 0.12;
+      ctx.fillStyle = '#22c55e';
+      ctx.beginPath();
+      ctx.arc(player.x + player.w / 2, player.y + player.h / 2, pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
     }
+
     const body = ctx.createLinearGradient(player.x, player.y, player.x, player.y + player.h);
     body.addColorStop(0, '#ffffff');
     body.addColorStop(1, '#83e9ff');
@@ -354,6 +525,22 @@ export function createGame(canvas, callbacks = {}) {
     ctx.fillStyle = '#26d9d0';
     ctx.fillRect(player.x + 8, player.y + 29, 19, 5);
 
+    for (const d of state.damageTexts) {
+      const alpha = clamp(d.life / d.maxLife, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(d.x, d.y);
+      ctx.rotate(d.rotation);
+      ctx.font = `900 ${d.size}px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = 'rgba(20, 0, 0, .85)';
+      ctx.strokeText(d.text, 0, 0);
+      ctx.fillStyle = '#ff4d6d';
+      ctx.fillText(d.text, 0, 0);
+      ctx.restore();
+    }
+
     ctx.restore();
 
     if (!state.running) {
@@ -365,7 +552,7 @@ export function createGame(canvas, callbacks = {}) {
       ctx.textAlign = 'center';
       ctx.fillText('Press Space / Tap to Start', width / 2, height / 2 - 8);
       ctx.font = '15px system-ui, sans-serif';
-      ctx.fillText('Jump, collect shields, unlock milestone NFTs.', width / 2, height / 2 + 24);
+      ctx.fillText('Jump, collect green shields, unlock milestone NFTs.', width / 2, height / 2 + 24);
       ctx.restore();
     }
   }
@@ -397,6 +584,8 @@ export function createGame(canvas, callbacks = {}) {
     start: reset,
     jump,
     snapshot,
+    setSoundEnabled,
+    isSoundEnabled,
     destroy() {
       window.removeEventListener('resize', resize);
       window.removeEventListener('keydown', onKeyDown);
