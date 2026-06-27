@@ -19,7 +19,7 @@ app.innerHTML = `
       <div>
         <p class="eyebrow">Base • NFT Milestone Runner</p>
         <h1>Base Quest Milestones</h1>
-        <p class="lead">Run, jump, collect shields, unlock safe ERC-721 milestone NFTs. No approvals. No token transfers. No server.</p>
+        <p class="lead">Run, jump, collect green shields, lose score on protected hits, hear soft game sounds, and mint safe ERC-721 milestone NFTs. No approvals. No token transfers. No server.</p>
       </div>
       <div class="walletBox">
         <button id="connectBtn" class="primary">Connect Wallet</button>
@@ -33,6 +33,7 @@ app.innerHTML = `
         <div class="controls">
           <button id="startBtn">Start / Restart</button>
           <button id="jumpBtn">Jump</button>
+          <button id="soundBtn">Sound: On</button>
           <button id="mintBtn" class="accent" disabled>Mint NFT</button>
         </div>
       </div>
@@ -45,6 +46,8 @@ app.innerHTML = `
           <div><dt>Score Unlocked</dt><dd id="unlocked">None</dd></div>
           <div><dt>Mintable NFT</dt><dd id="mintable">None</dd></div>
           <div><dt>Play Time</dt><dd id="seconds">0s</dd></div>
+          <div><dt>Protected Hit Penalty</dt><dd id="penalty">-200</dd></div>
+          <div><dt>Last Hit</dt><dd id="lastPenalty">None</dd></div>
           <div><dt>Next Requirement</dt><dd id="requirement">1,200 score • 20s</dd></div>
         </dl>
         <div id="message" class="message">Press Space, tap the game, or use Jump.</div>
@@ -70,11 +73,14 @@ const stageEl = $('#stage');
 const unlockedEl = $('#unlocked');
 const mintableEl = $('#mintable');
 const secondsEl = $('#seconds');
+const penaltyEl = $('#penalty');
+const lastPenaltyEl = $('#lastPenalty');
 const requirementEl = $('#requirement');
 const messageEl = $('#message');
 const mintBtn = $('#mintBtn');
 const connectBtn = $('#connectBtn');
 const walletStatus = $('#walletStatus');
+const soundBtn = $('#soundBtn');
 
 let lastSnapshot = null;
 
@@ -97,6 +103,10 @@ function requirementText(snapshot) {
   return `#${next.milestone} ${next.name}: ${next.score.toLocaleString()} score • ${next.minPlaySeconds}s${missing.length ? ` (${missing.join(' + ')})` : ''}`;
 }
 
+function updateSoundButton() {
+  soundBtn.textContent = game.isSoundEnabled() ? 'Sound: On' : 'Sound: Off';
+}
+
 function updateMintButton(snapshot) {
   const mintable = snapshot?.mintableMilestone;
   const canMint = Boolean(CONFIG.contractAddress && walletState.account && mintable);
@@ -115,11 +125,15 @@ const game = createGame($('#gameCanvas'), {
   onMilestone(snapshot) {
     updateStats(snapshot);
   },
+  onPenalty(snapshot, amount, row) {
+    updateStats(snapshot);
+    messageEl.textContent = `Shield protected you. -${amount.toLocaleString()} score in ${row.label}.`;
+  },
   onGameOver(snapshot) {
     updateStats(snapshot);
 
     if (snapshot.mintableMilestone) {
-      messageEl.textContent = `${milestoneLabel(snapshot.mintableMilestone)} is ready to mint. Play time: ${snapshot.playSeconds}s.`;
+      messageEl.textContent = `${milestoneLabel(snapshot.mintableMilestone)} is ready to mint. Final play time: ${snapshot.playSeconds}s.`;
     } else {
       messageEl.textContent = `Game over. NFT mint is locked. ${requirementText(snapshot)}`;
     }
@@ -135,6 +149,8 @@ function updateStats(snapshot) {
   unlockedEl.textContent = milestoneLabel(snapshot.scoreUnlockedMilestone);
   mintableEl.textContent = milestoneLabel(snapshot.mintableMilestone);
   secondsEl.textContent = `${snapshot.playSeconds}s`;
+  penaltyEl.textContent = `-${snapshot.currentPenalty.toLocaleString()} (${snapshot.penaltyWindow.label})`;
+  lastPenaltyEl.textContent = snapshot.lastPenalty ? `-${snapshot.lastPenalty.toLocaleString()}` : 'None';
   requirementEl.textContent = requirementText(snapshot);
 
   updateMintButton(snapshot);
@@ -148,6 +164,10 @@ function updateStats(snapshot) {
 
 $('#startBtn').addEventListener('click', () => game.start());
 $('#jumpBtn').addEventListener('click', () => game.jump());
+soundBtn.addEventListener('click', () => {
+  game.setSoundEnabled(!game.isSoundEnabled());
+  updateSoundButton();
+});
 
 connectBtn.addEventListener('click', async () => {
   try {
@@ -190,6 +210,8 @@ mintBtn.addEventListener('click', async () => {
     updateStats(lastSnapshot || game.snapshot());
   }
 });
+
+updateSoundButton();
 
 if (!CONFIG.contractAddress) {
   messageEl.textContent = 'Contract not configured yet. Add VITE_CONTRACT_ADDRESS in GitHub/Vercel variables.';
