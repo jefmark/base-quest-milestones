@@ -1,4 +1,4 @@
-const STAGE_CONFIG = [
+export const STAGE_CONFIG = [
   { milestone: 1, name: 'Rookie Runner', score: 1200, minPlaySeconds: 20, speed: 5.4 },
   { milestone: 2, name: 'Chain Jumper', score: 5000, minPlaySeconds: 10, speed: 6.2 },
   { milestone: 3, name: 'Base Sprinter', score: 10000, minPlaySeconds: 10, speed: 7.0 },
@@ -16,6 +16,7 @@ export function createGame(canvas, callbacks = {}) {
     running: false,
     paused: false,
     startedAt: 0,
+    endedAt: 0,
     lastTime: 0,
     score: 0,
     best: Number(localStorage.getItem('baseQuestBest') || 0),
@@ -46,6 +47,7 @@ export function createGame(canvas, callbacks = {}) {
     state.running = true;
     state.paused = false;
     state.startedAt = performance.now();
+    state.endedAt = 0;
     state.lastTime = performance.now();
     state.score = 0;
     state.stageIndex = 0;
@@ -59,13 +61,57 @@ export function createGame(canvas, callbacks = {}) {
     callbacks.onUpdate?.(snapshot());
   }
 
+  function getPlaySeconds() {
+    if (!state.startedAt) return 0;
+    const endTime = !state.running && state.endedAt ? state.endedAt : performance.now();
+    return Math.max(0, Math.floor((endTime - state.startedAt) / 1000));
+  }
+
+  function getHighestScoreMilestone() {
+    let unlocked = null;
+    for (const m of STAGE_CONFIG) {
+      if (state.score >= m.score) unlocked = m;
+    }
+    return unlocked;
+  }
+
+  function getMintableMilestone() {
+    const seconds = getPlaySeconds();
+    let mintable = null;
+    for (const m of STAGE_CONFIG) {
+      if (state.score >= m.score && seconds >= m.minPlaySeconds) mintable = m;
+    }
+    return mintable;
+  }
+
+  function getNextRequirement() {
+    const seconds = getPlaySeconds();
+    for (const m of STAGE_CONFIG) {
+      if (state.score < m.score || seconds < m.minPlaySeconds) {
+        return {
+          ...m,
+          remainingScore: Math.max(0, Math.ceil(m.score - state.score)),
+          remainingSeconds: Math.max(0, m.minPlaySeconds - seconds),
+        };
+      }
+    }
+    return null;
+  }
+
   function snapshot() {
+    const playSeconds = getPlaySeconds();
+    const scoreUnlocked = getHighestScoreMilestone();
+    const mintable = getMintableMilestone();
+
     return {
       score: Math.floor(state.score),
       best: Math.floor(state.best),
-      milestoneUnlocked: state.milestoneUnlocked,
+      milestoneUnlocked: scoreUnlocked?.milestone || 0,
+      scoreUnlockedMilestone: scoreUnlocked,
+      mintableMilestone: mintable,
+      nextRequirement: getNextRequirement(),
       stage: STAGE_CONFIG[state.stageIndex],
-      playSeconds: Math.floor((performance.now() - state.startedAt) / 1000),
+      playSeconds,
       running: state.running,
     };
   }
@@ -124,6 +170,7 @@ export function createGame(canvas, callbacks = {}) {
   }
 
   function endGame() {
+    state.endedAt = performance.now();
     state.running = false;
     state.shake = 18;
     if (state.score > state.best) {
