@@ -1,0 +1,11 @@
+{
+  "name": "Gasless Ghost #4",
+  "description": "You move silently across the chain. No gas, no trace, just pure flow.",
+  "image": "https://YOUR_DOMAIN/nft/4.png",
+  "attributes": [
+    { "trait_type": "Milestone", "value": "4" },
+    { "trait_type": "Style", "value": "Stealth" },
+    { "trait_type": "Difficulty", "value": "Medium-Hard" },
+    { "trait_type": "World", "value": "Base Quest" }
+  ]
+}
