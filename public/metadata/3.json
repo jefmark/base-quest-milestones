@@ -1,0 +1,11 @@
+{
+  "name": "Base Sprinter #3",
+  "description": "Speed becomes your weapon. Only the fast survive in the Base arena.",
+  "image": "https://YOUR_DOMAIN/nft/3.png",
+  "attributes": [
+    { "trait_type": "Milestone", "value": "3" },
+    { "trait_type": "Skill", "value": "Speed" },
+    { "trait_type": "Difficulty", "value": "Medium" },
+    { "trait_type": "World", "value": "Base Quest" }
+  ]
+}
