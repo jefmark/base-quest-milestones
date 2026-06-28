@@ -1,0 +1,11 @@
+{
+  "name": "Rookie Runner #1",
+  "description": "A fresh runner enters the Base Quest world. Every legend starts from here.",
+  "image": "https://YOUR_DOMAIN/nft/1.png",
+  "attributes": [
+    { "trait_type": "Milestone", "value": "1" },
+    { "trait_type": "Rank", "value": "Rookie" },
+    { "trait_type": "Difficulty", "value": "Easy" },
+    { "trait_type": "World", "value": "Base Quest" }
+  ]
+}
