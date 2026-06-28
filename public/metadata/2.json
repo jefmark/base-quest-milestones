@@ -1,0 +1,11 @@
+{
+  "name": "Chain Jumper #2",
+  "description": "You’ve learned to move across chains of obstacles. Timing is everything.",
+  "image": "https://YOUR_DOMAIN/nft/2.png",
+  "attributes": [
+    { "trait_type": "Milestone", "value": "2" },
+    { "trait_type": "Skill", "value": "Timing" },
+    { "trait_type": "Difficulty", "value": "Easy-Medium" },
+    { "trait_type": "World", "value": "Base Quest" }
+  ]
+}
