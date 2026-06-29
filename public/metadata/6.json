@@ -1,11 +1,24 @@
 {
   "name": "Onchain Legend #6",
   "description": "A true legend of Base. Your name is now written onchain forever.",
-  "image": "https://YOUR_DOMAIN/nft/6.png",
+  "image": "https://jefmark.github.io/base-quest-milestones/nft/6.png",
+  "external_url": "https://jefmark.github.io/base-quest-milestones/",
   "attributes": [
-    { "trait_type": "Milestone", "value": "6" },
-    { "trait_type": "Title", "value": "Legend" },
-    { "trait_type": "Difficulty", "value": "Extreme" },
-    { "trait_type": "World", "value": "Base Quest" }
+    {
+      "trait_type": "Milestone",
+      "value": "6"
+    },
+    {
+      "trait_type": "Title",
+      "value": "Legend"
+    },
+    {
+      "trait_type": "Difficulty",
+      "value": "Extreme"
+    },
+    {
+      "trait_type": "World",
+      "value": "Base Quest"
+    }
   ]
 }
