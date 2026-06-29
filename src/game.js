@@ -8,13 +8,13 @@ export const STAGE_CONFIG = [
 ];
 
 export const PENALTY_CONFIG = [
-  { label: '0-20s', until: 20, penalty: 200 },
-  { label: '20-30s', until: 30, penalty: 300 },
-  { label: '30-40s', until: 40, penalty: 500 },
-  { label: '40-50s', until: 50, penalty: 750 },
-  { label: '50-65s', until: 65, penalty: 1200 },
-  { label: '65-82s', until: 82, penalty: 2000 },
-  { label: '82s+', until: Number.POSITIVE_INFINITY, penalty: 5000 },
+  { label: '0-20s', until: 20, penalty: 100 },
+  { label: '20-45s', until: 45, penalty: 250 },
+  { label: '45-70s', until: 70, penalty: 500 },
+  { label: '70-95s', until: 95, penalty: 850 },
+  { label: '95-125s', until: 125, penalty: 1300 },
+  { label: '125-160s', until: 160, penalty: 2000 },
+  { label: '160s+', until: Number.POSITIVE_INFINITY, penalty: 3000 },
 ];
 
 export const FINAL_REPEAT_SECONDS = 10;
