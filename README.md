@@ -922,6 +922,20 @@ Use these official references when modifying or extending the project.
 - Hardhat Deployment Overview: https://hardhat.org/docs/guides/deployment
 - Remix Deploy and Run: https://remix-ide.readthedocs.io/en/latest/run.html
 
+  
+---
+
+Contact
+
+Have feedback, questions, or collaboration ideas?
+
+- X / Twitter: "@Crypto30724" (https://x.com/Crypto30724)
+- Farcaster / Warpcast: "@Crypto30724" (https://warpcast.com/crypto30724)
+- Email: "Crypto30724@gmail.com" (mailto:Crypto30724@gmail.com)
+
+You can also open a GitHub issue if you find a bug or want to suggest an improvement.
+
+
 ---
 
 ## License
