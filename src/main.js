@@ -1,7 +1,14 @@
 import './style.css';
+
 import { CONFIG } from './config.js';
 import { createGame, STAGE_CONFIG } from './game.js';
-import { connectWallet, getBalanceText, mintMilestone, shortAddress, walletState } from './wallet.js';
+import {
+  connectWallet,
+  getBalanceText,
+  mintMilestone,
+  shortAddress,
+  walletState,
+} from './wallet.js';
 
 const app = document.querySelector('#app');
 
@@ -15,30 +22,41 @@ const milestoneCards = STAGE_CONFIG.map((m) => `
 
 app.innerHTML = `
   <main class="shell">
-    <section class="hero card">
+    <section class="hero">
       <div>
         <p class="eyebrow">Base • NFT Milestone Runner</p>
         <h1>Base Quest Milestones</h1>
-        <p class="lead">Run, jump, collect green shields, lose score on protected hits, hear soft game sounds, and mint safe ERC-721 milestone NFTs. No approvals. No token transfers. No server.</p>
+        <p class="lead">
+          Run, jump, collect green shields, lose score on protected hits, and mint ERC-721 milestone NFTs.
+          This version adds client-side anti-cheat checks without changing the smart contract.
+        </p>
       </div>
-      <div class="walletBox">
-        <button id="connectBtn" class="primary">Connect Wallet</button>
-        <p id="walletStatus" class="muted">Live on Base Mainnet. Play, score, and mint milestone NFT badges.</p>
+
+      <div class="wallet">
+        <button id="connectBtn">Connect Wallet</button>
+        <p id="walletStatus" class="muted">Live on Base Mainnet. Play, score, finish the run, then mint.</p>
       </div>
     </section>
 
-    <section class="gameGrid">
-      <div class="card gameCard">
-        <canvas id="gameCanvas" aria-label="Base Quest game canvas"></canvas>
+    <section class="game-grid">
+      <div class="card game-card">
+        <canvas id="gameCanvas"></canvas>
+
         <div class="controls">
           <button id="startBtn">Start / Restart</button>
           <button id="jumpBtn">Jump</button>
           <button id="soundBtn">Sound: On</button>
-          <button id="mintBtn" class="accent" disabled>Mint NFT</button>
+          <button id="mintBtn" disabled>Mint NFT Locked</button>
         </div>
+
+        <p id="message" class="muted">
+          Anti-cheat rule: mint is allowed only after a finished clean run.
+        </p>
       </div>
+
       <aside class="card stats">
         <h2>Run Stats</h2>
+
         <dl>
           <div><dt>Score</dt><dd id="score">0</dd></div>
           <div><dt>Best</dt><dd id="best">0</dd></div>
@@ -46,15 +64,24 @@ app.innerHTML = `
           <div><dt>Score Unlocked</dt><dd id="unlocked">None</dd></div>
           <div><dt>Mintable NFT</dt><dd id="mintable">None</dd></div>
           <div><dt>Play Time</dt><dd id="seconds">0s</dd></div>
-          <div><dt>Protected Hit Penalty</dt><dd id="penalty">-200</dd></div>
+          <div><dt>Protected Hit Penalty</dt><dd id="penalty">-100</dd></div>
           <div><dt>Last Hit</dt><dd id="lastPenalty">None</dd></div>
+          <div><dt>Anti-Cheat</dt><dd id="antiCheat">Not started</dd></div>
           <div><dt>Next Requirement</dt><dd id="requirement">1,200 score • 20s</dd></div>
         </dl>
-        <div id="message" class="message">Press Space, tap the game, or use Jump.</div>
-        <div class="securityNote">
-          <strong>Wallet Safety:</strong> this app only calls <code>mintMilestone</code>. Reject any wallet popup asking for token approval or asset transfer.
-        </div>
+
+        <p class="muted">
+          Press Space, tap the game, or use Jump.
+        </p>
       </aside>
+    </section>
+
+    <section class="card info">
+      <h2>Wallet Safety</h2>
+      <p>
+        This app only calls <code>mintMilestone</code>. Reject any wallet popup asking for token approval,
+        asset transfer, or unlimited permission.
+      </p>
     </section>
 
     <section class="card info">
@@ -67,6 +94,7 @@ app.innerHTML = `
 `;
 
 const $ = (id) => document.querySelector(id);
+
 const scoreEl = $('#score');
 const bestEl = $('#best');
 const stageEl = $('#stage');
@@ -81,6 +109,7 @@ const mintBtn = $('#mintBtn');
 const connectBtn = $('#connectBtn');
 const walletStatus = $('#walletStatus');
 const soundBtn = $('#soundBtn');
+const antiCheatEl = $('#antiCheat');
 
 let lastSnapshot = null;
 
@@ -97,10 +126,18 @@ function requirementText(snapshot) {
   }
 
   const missing = [];
-  if (next.remainingScore > 0) missing.push(`${next.remainingScore.toLocaleString()} more score`);
-  if (next.remainingSeconds > 0) missing.push(`${next.remainingSeconds}s more play time`);
 
-  return `#${next.milestone} ${next.name}: ${next.score.toLocaleString()} score • ${next.minPlaySeconds}s${missing.length ? ` (${missing.join(' + ')})` : ''}`;
+  if (next.remainingScore > 0) {
+    missing.push(`${next.remainingScore.toLocaleString()} more score`);
+  }
+
+  if (next.remainingSeconds > 0) {
+    missing.push(`${next.remainingSeconds}s more play time`);
+  }
+
+  return `#${next.milestone} ${next.name}: ${next.score.toLocaleString()} score • ${next.minPlaySeconds}s${
+    missing.length ? ` (${missing.join(' + ')})` : ''
+  }`;
 }
 
 function updateSoundButton() {
@@ -109,35 +146,60 @@ function updateSoundButton() {
 
 function updateMintButton(snapshot) {
   const mintable = snapshot?.mintableMilestone;
-  const canMint = Boolean(CONFIG.contractAddress && walletState.account && mintable);
+  const canMint = Boolean(CONFIG.contractAddress && walletState.account && mintable && snapshot.mintAllowed);
 
   mintBtn.disabled = !canMint;
 
-  if (mintable) {
-    mintBtn.textContent = `Mint #${mintable.milestone} ${mintable.name}`;
-  } else {
+  if (!mintable) {
     mintBtn.textContent = 'Mint NFT Locked';
+    return;
   }
+
+  if (!walletState.account) {
+    mintBtn.textContent = `Connect wallet to mint #${mintable.milestone}`;
+    return;
+  }
+
+  if (!snapshot.mintAllowed) {
+    mintBtn.textContent = `Mint locked: #${mintable.milestone}`;
+    return;
+  }
+
+  mintBtn.textContent = `Mint #${mintable.milestone} ${mintable.name}`;
 }
 
 const game = createGame($('#gameCanvas'), {
   onUpdate: updateStats,
+
   onMilestone(snapshot) {
     updateStats(snapshot);
   },
+
   onPenalty(snapshot, amount, row) {
     updateStats(snapshot);
     messageEl.textContent = `Shield protected you. -${amount.toLocaleString()} score in ${row.label}.`;
   },
+
+  onCheatFlag(snapshot, code, detail) {
+    updateStats(snapshot);
+    messageEl.textContent = `Anti-cheat blocked this run: ${code}. ${detail || 'Restart required.'}`;
+  },
+
   onGameOver(snapshot) {
     updateStats(snapshot);
 
-    if (snapshot.mintableMilestone) {
+    if (snapshot.mintAllowed && snapshot.mintableMilestone) {
       messageEl.textContent = `${milestoneLabel(snapshot.mintableMilestone)} is ready to mint. Final play time: ${snapshot.playSeconds}s.`;
-    } else {
-      messageEl.textContent = `Game over. NFT mint is locked. ${requirementText(snapshot)}`;
+      return;
     }
-  }
+
+    if (snapshot.mintableMilestone && !snapshot.mintAllowed) {
+      messageEl.textContent = `NFT score/time reached, but mint is blocked. ${snapshot.mintBlockedReason}`;
+      return;
+    }
+
+    messageEl.textContent = `Game over. NFT mint is locked. ${requirementText(snapshot)}`;
+  },
 });
 
 function updateStats(snapshot) {
@@ -152,18 +214,33 @@ function updateStats(snapshot) {
   penaltyEl.textContent = `-${snapshot.currentPenalty.toLocaleString()} (${snapshot.penaltyWindow.label})`;
   lastPenaltyEl.textContent = snapshot.lastPenalty ? `-${snapshot.lastPenalty.toLocaleString()}` : 'None';
   requirementEl.textContent = requirementText(snapshot);
+  antiCheatEl.textContent = snapshot.antiCheat?.status || 'Unknown';
 
   updateMintButton(snapshot);
 
-  if (snapshot.mintableMilestone) {
-    messageEl.textContent = `${milestoneLabel(snapshot.mintableMilestone)} is mintable now. Play time: ${snapshot.playSeconds}s.`;
-  } else if (snapshot.scoreUnlockedMilestone) {
+  if (snapshot.antiCheat && !snapshot.antiCheat.clean) {
+    messageEl.textContent = `${snapshot.antiCheat.status} Start a new run to mint.`;
+    return;
+  }
+
+  if (snapshot.mintableMilestone && snapshot.mintAllowed) {
+    messageEl.textContent = `${milestoneLabel(snapshot.mintableMilestone)} is mintable now.`;
+    return;
+  }
+
+  if (snapshot.mintableMilestone && !snapshot.mintAllowed) {
+    messageEl.textContent = `${milestoneLabel(snapshot.mintableMilestone)} reached, but mint is locked. ${snapshot.mintBlockedReason}`;
+    return;
+  }
+
+  if (snapshot.scoreUnlockedMilestone) {
     messageEl.textContent = `Score reached for ${milestoneLabel(snapshot.scoreUnlockedMilestone)}, but mint is still locked. ${requirementText(snapshot)}`;
   }
 }
 
 $('#startBtn').addEventListener('click', () => game.start());
 $('#jumpBtn').addEventListener('click', () => game.jump());
+
 soundBtn.addEventListener('click', () => {
   game.setSoundEnabled(!game.isSoundEnabled());
   updateSoundButton();
@@ -172,12 +249,15 @@ soundBtn.addEventListener('click', () => {
 connectBtn.addEventListener('click', async () => {
   try {
     await connectWallet();
+
     const balance = await getBalanceText();
+
     connectBtn.textContent = shortAddress(walletState.account);
     walletStatus.textContent = `${CONFIG.chainName} connected • ${balance}`;
     messageEl.textContent = CONFIG.contractAddress
-      ? 'Wallet connected. Play until score and time conditions are met.'
+      ? 'Wallet connected. Finish a clean run to mint.'
       : 'Wallet connected, but VITE_CONTRACT_ADDRESS is empty. Add the contract address.';
+
     updateStats(lastSnapshot || game.snapshot());
   } catch (err) {
     console.error(err);
@@ -193,16 +273,18 @@ mintBtn.addEventListener('click', async () => {
       throw new Error('No NFT is mintable yet. Reach the required score and play time first.');
     }
 
+    const payload = game.getMintPayload(mintable.milestone);
+
     mintBtn.disabled = true;
-    messageEl.textContent = `Minting #${mintable.milestone} ${mintable.name}. Confirm only if it calls mintMilestone and asks for gas only.`;
+    messageEl.textContent = `Minting #${payload.milestone}. Confirm only if it calls mintMilestone and asks for gas only.`;
 
     const result = await mintMilestone(
-      mintable.milestone,
-      lastSnapshot.score,
-      lastSnapshot.playSeconds
+      payload.milestone,
+      payload.score,
+      payload.playSeconds
     );
 
-    messageEl.innerHTML = `NFT minted. <a href="${CONFIG.explorerUrl}/tx/${result.hash}" target="_blank" rel="noreferrer">View transaction</a>`;
+    messageEl.innerHTML = `NFT minted. <a href="${CONFIG.explorerUrl}/tx/${result.hash}" target="_blank" rel="noopener">View transaction</a>`;
   } catch (err) {
     console.error(err);
     messageEl.textContent = err.shortMessage || err.message || 'Mint failed.';
