@@ -65,7 +65,7 @@ const KNOWN_WALLETS = [
   {
     id: 'rabby',
     name: 'Rabby Wallet',
-    subtitle: 'Desktop EVM wallet with transaction simulation',
+    subtitle: 'Desktop EVM wallet with transaction simulation. GitHub Pages domains may show Rabby reputation warnings.',
     rdns: ['io.rabby', 'io.rabby.wallet'],
     flags: ['isRabby'],
     desktopInstallUrl: 'https://rabby.io/',
@@ -134,6 +134,29 @@ function currentDappUrl() {
 
 function stripProtocol(url) {
   return String(url).replace(/^https?:\/\//i, '');
+}
+
+function openMobileWalletDeepLink(url) {
+  if (!isBrowser()) return;
+
+  // Mobile browsers are strict about popups. Navigating the current tab is the
+  // most reliable way to trigger MetaMask/Trust/Coinbase universal links.
+  const link = String(url);
+  const anchor = document.createElement('a');
+  anchor.href = link;
+  anchor.target = '_self';
+  anchor.rel = 'noreferrer';
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+
+  window.setTimeout(() => {
+    try {
+      window.location.assign(link);
+    } catch {
+      window.location.href = link;
+    }
+  }, 80);
 }
 
 function emitWalletChanged() {
@@ -382,7 +405,7 @@ function walletConnectMetadata() {
   const origin = isBrowser() ? window.location.origin : 'https://jefmark.github.io';
   const normalizedBase = basePath.endsWith('/') ? basePath : `${basePath}/`;
   const appUrl = `${origin}${normalizedBase}`;
-  const iconUrl = `${appUrl}nft/1.png`;
+  const iconUrl = `${appUrl}favicon.svg`;
 
   return {
     name: 'Base Quest Milestones',
@@ -639,6 +662,7 @@ function walletStatusLabel(wallet, installed) {
 }
 
 function walletDescription(wallet, installed) {
+  if (wallet.id === 'rabby') return installed ? 'Detected in this browser. Rabby may show a reputation warning for new GitHub Pages domains; this is controlled by Rabby, not by the dapp code.' : 'Rabby desktop wallet. New GitHub Pages domains may show Rabby reputation warnings until the site gains reputation/listings.';
   if (wallet.id === WALLETCONNECT_ID) return 'Connect MetaMask, Trust Wallet, Coinbase Wallet and other EVM wallets by mobile deep link or QR.';
   if (wallet.id === BROWSER_WALLET_ID) return installed ? 'Uses the currently active injected EVM provider.' : 'No injected EVM provider was detected in this browser.';
   if (installed) return `${wallet.subtitle}. Detected in this browser.`;
@@ -690,7 +714,7 @@ function renderWalletPicker() {
           <button class="bqm-wallet-close" type="button" aria-label="Close wallet picker">×</button>
         </header>
         <div class="bqm-wallet-list">${rowsHtml}</div>
-        <div class="bqm-wallet-status">${pickerState.message || 'Select a wallet. WalletConnect works best on Android Chrome and normal mobile browsers.'}</div>
+        <div class="bqm-wallet-status">${pickerState.message || 'Select a wallet. On Android Chrome, MetaMask/Trust/Coinbase open their wallet app; WalletConnect stays inside this page.'}</div>
       </section>
     </div>
   `;
@@ -742,9 +766,9 @@ async function handleWalletPick(walletId) {
     }
 
     if (isMobile() && wallet.mobileOpenUrl) {
-      setPickerMessage(`Opening WalletConnect for ${wallet.name}. Confirm in your wallet app, then return to this page.`);
-      await connectWalletConnect();
-      closeWalletPicker();
+      const deepLink = wallet.mobileOpenUrl(currentDappUrl());
+      setPickerMessage(`Opening ${wallet.name} app. If it opens the game inside the wallet browser, tap Connect Wallet again there. If nothing opens, return here and choose WalletConnect.`);
+      openMobileWalletDeepLink(deepLink);
       return;
     }
 
