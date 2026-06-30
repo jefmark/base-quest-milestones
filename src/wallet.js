@@ -1,4 +1,4 @@
-import { BrowserProvider, Contract, formatUnits } from 'ethers';
+import { BrowserProvider, Contract, Interface, formatUnits } from 'ethers';
 import EthereumProvider from '@walletconnect/ethereum-provider';
 
 import { CONFIG, CONTRACT_ABI } from './config.js';
@@ -185,6 +185,103 @@ function normalizeRpcError(err, fallbackMessage = 'Wallet request failed.') {
   normalized.code = err?.code;
   normalized.cause = err;
   return normalized;
+}
+
+
+function withTimeout(promise, ms, timeoutMessage) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = window.setTimeout(() => reject(new Error(timeoutMessage)), ms);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timer));
+}
+
+function isMobileInjectedWallet() {
+  if (!isMobile()) return false;
+  const provider = walletState.eip1193Provider;
+  const name = normalize(walletState.walletName);
+  const ua = isBrowser() ? normalize(window.navigator.userAgent) : '';
+
+  return Boolean(
+    provider?.isTrust ||
+    provider?.isTrustWallet ||
+    provider?.isMetaMask ||
+    provider?.isCoinbaseWallet ||
+    name.includes('trust') ||
+    name.includes('metamask') ||
+    name.includes('coinbase') ||
+    ua.includes('trust') ||
+    ua.includes('metamask') ||
+    ua.includes('coinbase')
+  );
+}
+
+async function readAlreadyMintedWithFallback(contract, account, milestone) {
+  try {
+    return await withTimeout(
+      contract.hasMintedMilestone(account, milestone),
+      12000,
+      'Could not check previous mint status quickly enough. Please check your connection and try again.'
+    );
+  } catch (err) {
+    // Mobile wallet in-app browsers sometimes have weak eth_call implementations.
+    // For the first mint attempt, do not permanently block the user here; the contract
+    // will still revert if the NFT was already minted, and the wallet will show/return it.
+    if (isMobileInjectedWallet()) {
+      console.warn('hasMintedMilestone read failed on mobile wallet browser; continuing to send tx:', err);
+      return false;
+    }
+
+    throw err;
+  }
+}
+
+async function sendMintTransactionDirect(milestone, score, playSeconds) {
+  const provider = walletState.eip1193Provider;
+  if (!provider?.request) {
+    throw new Error('Wallet RPC provider is not ready. Disconnect, reconnect, and try again.');
+  }
+
+  const iface = new Interface(CONTRACT_ABI);
+  const data = iface.encodeFunctionData('mintMilestone', [milestone, score, playSeconds]);
+
+  const txParams = {
+    from: walletState.account,
+    to: CONFIG.contractAddress,
+    data,
+    value: '0x0',
+  };
+
+  let hash;
+  try {
+    hash = await withTimeout(
+      provider.request({
+        method: 'eth_sendTransaction',
+        params: [txParams],
+      }),
+      90000,
+      'Wallet did not return a transaction. Open the wallet app, check if a confirmation is waiting, then try again.'
+    );
+  } catch (err) {
+    throw normalizeRpcError(err, 'Wallet rejected or failed to send the mint transaction.');
+  }
+
+  if (!hash || typeof hash !== 'string') {
+    throw new Error('Wallet did not return a transaction hash. Try WalletConnect or reconnect the wallet.');
+  }
+
+  if (!walletState.provider) {
+    walletState.provider = new BrowserProvider(provider);
+  }
+
+  const receipt = await withTimeout(
+    walletState.provider.waitForTransaction(hash, 1),
+    180000,
+    `Transaction was submitted but confirmation is taking too long. Check it on ${CONFIG.explorerUrl}/tx/${hash}`
+  );
+
+  return { hash: receipt?.hash || hash };
 }
 
 function resetWalletState(keepProvider = false) {
@@ -943,6 +1040,10 @@ export async function mintMilestone(milestone, score, playSeconds) {
   await ensureCorrectNetwork();
   await refreshSignerAndContract();
 
+  if (!walletState.eip1193Provider?.request) {
+    throw new Error('Wallet provider is not ready. Disconnect, reconnect, and try mint again.');
+  }
+
   if (!walletState.contract || !walletState.signer) {
     throw new Error('Wallet signer is not ready. Disconnect, reconnect, and try mint again.');
   }
@@ -955,7 +1056,8 @@ export async function mintMilestone(milestone, score, playSeconds) {
     throw new Error('Invalid milestone number.');
   }
 
-  const alreadyMinted = await walletState.contract.hasMintedMilestone(
+  const alreadyMinted = await readAlreadyMintedWithFallback(
+    walletState.contract,
     walletState.account,
     safeMilestone
   );
@@ -964,31 +1066,11 @@ export async function mintMilestone(milestone, score, playSeconds) {
     throw new Error('You already minted this milestone.');
   }
 
-  let overrides = {};
-
-  try {
-    const estimatedGas = await walletState.contract.mintMilestone.estimateGas(
-      safeMilestone,
-      safeScore,
-      safePlaySeconds
-    );
-    overrides = { gasLimit: (estimatedGas * 125n) / 100n };
-  } catch (err) {
-    const reason = err?.shortMessage || err?.reason || err?.message || '';
-    if (reason) {
-      throw new Error(`Mint simulation failed before wallet confirmation: ${reason}`);
-    }
-    throw new Error('Mint simulation failed before wallet confirmation. Check contract address, milestone status, and Base gas balance.');
-  }
-
-  const tx = await walletState.contract.mintMilestone(
-    safeMilestone,
-    safeScore,
-    safePlaySeconds,
-    overrides
-  );
-
-  const receipt = await tx.wait();
-
-  return { hash: receipt.hash };
+  // Important mobile fix:
+  // Trust Wallet / MetaMask in-app browsers can fail silently when ethers runs
+  // preflight gas estimation before opening the wallet sheet. Sending the raw
+  // EIP-1193 eth_sendTransaction request lets the wallet itself show the gas
+  // confirmation UI. This works on desktop too, but it is especially important
+  // inside mobile wallet browsers.
+  return sendMintTransactionDirect(safeMilestone, safeScore, safePlaySeconds);
 }
