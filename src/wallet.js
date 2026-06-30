@@ -1,5 +1,7 @@
 import { BrowserProvider, Contract, formatUnits } from 'ethers';
-import { EthereumProvider } from '@walletconnect/ethereum-provider';
+import { createAppKit } from '@reown/appkit';
+import { EthersAdapter } from '@reown/appkit-adapter-ethers';
+import { base } from '@reown/appkit/networks';
 
 import { CONFIG, CONTRACT_ABI } from './config.js';
 
@@ -13,9 +15,6 @@ export const walletState = {
   connectionType: '',
   walletName: '',
 };
-
-let walletConnectProvider = null;
-let removeProviderListeners = [];
 
 const REQUIRED_WALLET_METHODS = [
   'eth_sendTransaction',
@@ -32,21 +31,17 @@ const REQUIRED_WALLET_EVENTS = [
   'disconnect',
 ];
 
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+let appKitModal = null;
+let unsubscribeProvider = null;
+let unsubscribeWalletInfo = null;
+let removeProviderListeners = [];
+let lastWalletInfo = null;
+
 const toHexChainId = (chainId) => `0x${Number(chainId).toString(16)}`;
 const normalizeHex = (value) => String(value || '').toLowerCase();
 
 function isBrowser() {
   return typeof window !== 'undefined';
-}
-
-export function isMobileBrowser() {
-  if (!isBrowser()) return false;
-
-  const ua = navigator.userAgent || '';
-  const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches;
-
-  return /Android|iPhone|iPad|iPod/i.test(ua) || Boolean(coarsePointer && window.innerWidth <= 900);
 }
 
 function emitWalletChanged() {
@@ -78,6 +73,21 @@ function normalizeRpcError(err, fallbackMessage = 'Wallet request failed.') {
   return normalized;
 }
 
+function walletConnectMetadata() {
+  const basePath = import.meta.env.BASE_URL || '/';
+  const origin = isBrowser() ? window.location.origin : 'https://jefmark.github.io';
+  const normalizedBase = basePath.endsWith('/') ? basePath : `${basePath}/`;
+  const appUrl = `${origin}${normalizedBase}`;
+  const iconUrl = `${appUrl}nft/1.png`;
+
+  return {
+    name: 'Base Quest Milestones',
+    description: 'Base Mainnet NFT milestone runner game',
+    url: appUrl,
+    icons: [iconUrl],
+  };
+}
+
 function createContractIfReady() {
   if (!CONFIG.contractAddress || !walletState.signer) {
     walletState.contract = null;
@@ -98,7 +108,7 @@ function clearProviderListeners() {
     try {
       remove();
     } catch {
-      // Some injected providers do not expose reliable remove APIs.
+      // Some providers do not expose reliable remove APIs.
     }
   }
 
@@ -114,6 +124,41 @@ function listen(provider, eventName, handler) {
     if (provider.removeListener) provider.removeListener(eventName, handler);
     else if (provider.off) provider.off(eventName, handler);
   });
+}
+
+function resetWalletState(keepProvider = false) {
+  walletState.account = '';
+  walletState.provider = null;
+  walletState.signer = null;
+  walletState.contract = null;
+  walletState.chainOk = false;
+  walletState.connectionType = '';
+  walletState.walletName = '';
+
+  if (!keepProvider) {
+    walletState.eip1193Provider = null;
+  }
+}
+
+function walletNameFromInfo(fallback = 'Wallet') {
+  return lastWalletInfo?.name || fallback;
+}
+
+async function refreshSignerAndContract() {
+  if (!walletState.eip1193Provider) return;
+
+  walletState.provider = new BrowserProvider(walletState.eip1193Provider);
+
+  const accounts = await walletState.eip1193Provider
+    .request({ method: 'eth_accounts' })
+    .catch(() => []);
+
+  walletState.account = accounts?.[0] || walletState.account;
+
+  if (walletState.account) {
+    walletState.signer = await walletState.provider.getSigner();
+    createContractIfReady();
+  }
 }
 
 function attachProviderListeners(provider) {
@@ -151,141 +196,111 @@ function attachProviderListeners(provider) {
   });
 }
 
-function resetWalletState(keepProvider = false) {
-  walletState.account = '';
-  walletState.provider = null;
-  walletState.signer = null;
-  walletState.contract = null;
-  walletState.chainOk = false;
-  walletState.connectionType = '';
-  walletState.walletName = '';
+async function syncFromAppKitState(state = {}) {
+  const modal = getAppKitModal();
+  const provider = state.provider || modal.getWalletProvider?.() || modal.getProviders?.()?.eip155 || null;
+  const address = state.address || modal.getAddress?.() || '';
+  const isConnected = Boolean(state.isConnected ?? modal.getIsConnected?.());
 
-  if (!keepProvider) {
-    walletState.eip1193Provider = null;
-  }
-}
-
-function providerLabel(providerDetail, fallback = 'Injected Wallet') {
-  const info = providerDetail?.info;
-  return info?.name || providerDetail?.provider?.name || fallback;
-}
-
-function providerIdentity(providerDetail) {
-  const provider = providerDetail?.provider;
-  const name = String(providerDetail?.info?.name || provider?.name || '').toLowerCase();
-  const rdns = String(providerDetail?.info?.rdns || '').toLowerCase();
-  const source = String(providerDetail?.source || '').toLowerCase();
-
-  return { provider, name, rdns, source };
-}
-
-function hasKeplrGlobal() {
-  if (!isBrowser()) return false;
-  return Boolean(window.keplr || window.getOfflineSigner || window.keplrEthereum || window.leap);
-}
-
-function isKeplrLikeProvider(providerDetail) {
-  const { provider, name, rdns } = providerIdentity(providerDetail);
-
-  return (
-    rdns.includes('keplr') ||
-    rdns.includes('chainapsis') ||
-    name.includes('keplr') ||
-    provider?.isKeplr === true ||
-    provider?.keplr === true
-  );
-}
-
-function isVerifiedEip6963Provider(providerDetail) {
-  return providerDetail?.source === 'eip6963' && Boolean(providerDetail?.info?.rdns || providerDetail?.info?.name);
-}
-
-function isAmbiguousLegacyProvider(providerDetail) {
-  const { source, rdns } = providerIdentity(providerDetail);
-  return source.startsWith('legacy') && (!rdns || rdns === 'injected' || rdns === 'legacy.injected');
-}
-
-function isMetaMaskProvider(providerDetail) {
-  const { provider, name, rdns } = providerIdentity(providerDetail);
-
-  if (isKeplrLikeProvider(providerDetail)) return false;
-  if (rdns.includes('metamask') || name.includes('metamask')) return true;
-
-  // Some non-MetaMask wallets expose isMetaMask=true for compatibility.
-  // Do not trust this flag when Keplr is installed, because Keplr can hijack
-  // the legacy window.ethereum route and open itself when the user expects MetaMask.
-  if (provider?.isMetaMask === true) {
-    return !hasKeplrGlobal() || isMobileBrowser() || isVerifiedEip6963Provider(providerDetail);
+  if (!isConnected || !provider || !address) {
+    resetWalletState(false);
+    emitWalletChanged();
+    return;
   }
 
-  return false;
-}
+  walletState.eip1193Provider = provider;
+  walletState.connectionType = modal.getWalletProviderType?.() || 'appkit';
+  walletState.walletName = walletNameFromInfo(walletState.connectionType);
+  walletState.provider = new BrowserProvider(provider);
+  walletState.account = address;
 
-function isTrustProvider(providerDetail) {
-  const { provider, name, rdns } = providerIdentity(providerDetail);
+  attachProviderListeners(provider);
 
-  if (isKeplrLikeProvider(providerDetail)) return false;
-
-  return rdns.includes('trust') || name.includes('trust') || provider?.isTrust === true;
-}
-
-function isCoinbaseProvider(providerDetail) {
-  const { provider, name, rdns } = providerIdentity(providerDetail);
-
-  if (isKeplrLikeProvider(providerDetail)) return false;
-
-  return rdns.includes('coinbase') || name.includes('coinbase') || provider?.isCoinbaseWallet === true;
-}
-
-function walletMatches(providerDetail, walletId) {
-  if (walletId === 'metamask') return isMetaMaskProvider(providerDetail);
-  if (walletId === 'trust') return isTrustProvider(providerDetail);
-  if (walletId === 'coinbase') return isCoinbaseProvider(providerDetail);
-  return false;
-}
-
-function providerScore(providerDetail) {
-  if (isMetaMaskProvider(providerDetail)) return 100;
-  if (isTrustProvider(providerDetail)) return 95;
-  if (isCoinbaseProvider(providerDetail)) return 90;
-  if (isKeplrLikeProvider(providerDetail)) return 1;
-  if (isAmbiguousLegacyProvider(providerDetail) && hasKeplrGlobal()) return 2;
-  return 50;
-}
-
-function providerKey(providerDetail, fallbackIndex = 0) {
-  const { provider } = providerIdentity(providerDetail);
-
-  return (
-    providerDetail?.info?.uuid ||
-    providerDetail?.info?.rdns ||
-    providerDetail?.info?.name ||
-    provider?.id ||
-    provider?.name ||
-    `${providerDetail?.source || 'wallet'}-${fallbackIndex}`
-  );
-}
-
-function legacyProviderInfo(provider) {
-  if (provider?.isTrust) {
-    return { name: 'Trust Wallet', rdns: 'com.trustwallet.app' };
+  try {
+    await ensureCorrectNetwork();
+    await refreshSignerAndContract();
+  } catch (err) {
+    walletState.chainOk = false;
+    console.warn('Network check failed:', err);
   }
 
-  if (provider?.isCoinbaseWallet) {
-    return { name: 'Coinbase Wallet', rdns: 'com.coinbase.wallet' };
+  emitWalletChanged();
+}
+
+function getBaseNetwork() {
+  // Use Reown's official Base definition, but keep your RPC/explorer in config for ethers calls and fallback switching.
+  return base;
+}
+
+export function getAppKitModal() {
+  if (appKitModal) return appKitModal;
+
+  if (!CONFIG.walletConnectProjectId) {
+    throw new Error(
+      'WalletConnect Project ID is missing. Add VITE_WALLETCONNECT_PROJECT_ID in GitHub Actions variables and deploy again.'
+    );
   }
 
-  // Only call a legacy provider MetaMask when it is not ambiguous.
-  // Keplr and a few other wallets may set isMetaMask=true for compatibility.
-  if (provider?.isMetaMask && !hasKeplrGlobal()) {
-    return { name: 'MetaMask', rdns: 'io.metamask' };
-  }
+  const baseNetwork = getBaseNetwork();
 
-  if (provider?.isKeplr || hasKeplrGlobal()) {
-    return { name: 'Keplr / Ambiguous Browser Wallet', rdns: 'legacy.injected' };
-  }
+  appKitModal = createAppKit({
+    adapters: [new EthersAdapter()],
+    networks: [baseNetwork],
+    defaultNetwork: baseNetwork,
+    metadata: walletConnectMetadata(),
+    projectId: CONFIG.walletConnectProjectId,
+    enableWallets: true,
+    enableNetworkSwitch: false,
+    enableReconnect: true,
+    enableMobileFullScreen: true,
+    enableWalletGuide: true,
+    allowUnsupportedChain: false,
+    allWallets: 'SHOW',
+    defaultAccountTypes: { eip155: 'eoa' },
+    coinbasePreference: 'eoaOnly',
+    customRpcUrls: {
+      [`eip155:${CONFIG.chainId}`]: [{ url: CONFIG.rpcUrl }],
+    },
+    universalProviderConfigOverride: {
+      methods: { eip155: REQUIRED_WALLET_METHODS },
+      optionalMethods: { eip155: REQUIRED_WALLET_METHODS },
+      chains: { eip155: [String(CONFIG.chainId)] },
+      optionalChains: { eip155: [String(CONFIG.chainId)] },
+      events: { eip155: REQUIRED_WALLET_EVENTS },
+      optionalEvents: { eip155: REQUIRED_WALLET_EVENTS },
+      rpcMap: {
+        [CONFIG.chainId]: CONFIG.rpcUrl,
+      },
+      defaultChain: `eip155:${CONFIG.chainId}`,
+    },
+    features: {
+      analytics: true,
+      swaps: false,
+      onramp: false,
+      email: false,
+      socials: false,
+      connectMethodsOrder: ['wallet'],
+    },
+    themeMode: 'dark',
+  });
 
-  return { name: 'Browser Wallet', rdns: 'legacy.injected' };
+  appKitModal.setThemeMode?.('dark');
+
+  unsubscribeProvider = appKitModal.subscribeProvider?.((state) => {
+    void syncFromAppKitState(state);
+  });
+
+  unsubscribeWalletInfo = appKitModal.subscribeWalletInfo?.((info) => {
+    lastWalletInfo = info || null;
+    if (walletState.account) {
+      walletState.walletName = walletNameFromInfo(walletState.connectionType || 'Wallet');
+      emitWalletChanged();
+    }
+  });
+
+  void syncFromAppKitState();
+
+  return appKitModal;
 }
 
 export function shortAddress(address) {
@@ -293,305 +308,21 @@ export function shortAddress(address) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-export async function getInjectedWallets() {
-  if (!isBrowser()) return [];
+export async function openWalletModal() {
+  const modal = getAppKitModal();
 
-  const providers = new Map();
-  let sawEip6963 = false;
-
-  function addProvider(detail) {
-    if (!detail?.provider?.request) return;
-
-    const normalized = {
-      ...detail,
-      info: detail.info || legacyProviderInfo(detail.provider),
-      source: detail.source || 'unknown',
-    };
-
-    const key = providerKey(normalized, providers.size + 1);
-    providers.set(key, normalized);
-  }
-
-  function onProvider(event) {
-    sawEip6963 = true;
-    addProvider({
-      ...event.detail,
-      source: 'eip6963',
-    });
-  }
-
-  window.addEventListener('eip6963:announceProvider', onProvider);
-  window.dispatchEvent(new Event('eip6963:requestProvider'));
-
-  await delay(650);
-
-  window.removeEventListener('eip6963:announceProvider', onProvider);
-
-  // Prefer EIP-6963 because it lets us target the exact wallet the user chose.
-  // The legacy window.ethereum fallback is ambiguous when several wallets are installed.
-  if (!sawEip6963 && window.ethereum?.request) {
-    if (Array.isArray(window.ethereum.providers)) {
-      for (const provider of window.ethereum.providers) {
-        addProvider({
-          provider,
-          info: legacyProviderInfo(provider),
-          source: 'legacy-providers',
-        });
-      }
-    } else {
-      addProvider({
-        provider: window.ethereum,
-        info: legacyProviderInfo(window.ethereum),
-        source: 'legacy-window',
-      });
-    }
-  }
-
-  return Array.from(providers.values())
-    .sort((a, b) => providerScore(b) - providerScore(a));
+  // Always open Reown's wallet list, on both desktop and mobile.
+  // namespace eip155 = Ethereum/EVM only. This prevents Solana/Bitcoin wallet flows for this Base dApp.
+  await modal.open({ view: 'Connect', namespace: 'eip155' });
 }
 
-export async function getWalletChoices() {
-  const injectedWallets = await getInjectedWallets();
-  const choices = [];
-  const usedKeys = new Set();
-
-  function pushInjectedChoice(walletId, label, providerDetail, description = 'Detected in this browser') {
-    if (!providerDetail) return;
-
-    const key = providerKey(providerDetail, choices.length + 1);
-    if (usedKeys.has(key)) return;
-
-    usedKeys.add(key);
-    choices.push({
-      id: `${walletId}:${key}`,
-      type: 'injected',
-      walletId,
-      label,
-      description,
-      providerDetail,
-    });
-  }
-
-  pushInjectedChoice(
-    'metamask',
-    'MetaMask',
-    injectedWallets.find(isMetaMaskProvider),
-    'Verified browser provider. This will not use Keplr.'
-  );
-
-  pushInjectedChoice(
-    'trust',
-    'Trust Wallet',
-    injectedWallets.find(isTrustProvider),
-    'Detected in this browser. On mobile Chrome, use WalletConnect instead.'
-  );
-
-  pushInjectedChoice(
-    'coinbase',
-    'Coinbase Wallet',
-    injectedWallets.find(isCoinbaseProvider),
-    'Detected in this browser'
-  );
-
-  for (const detail of injectedWallets) {
-    if (isMetaMaskProvider(detail) || isTrustProvider(detail) || isCoinbaseProvider(detail)) {
-      continue;
-    }
-
-    // Do not show Keplr or ambiguous legacy providers for a Base EVM dApp.
-    // They are the reason the wrong wallet opens when the user expects MetaMask.
-    if (isKeplrLikeProvider(detail) || (isAmbiguousLegacyProvider(detail) && hasKeplrGlobal())) {
-      continue;
-    }
-
-    pushInjectedChoice(
-      'browser',
-      providerLabel(detail, 'Browser Wallet'),
-      detail,
-      'Detected browser wallet provider'
-    );
-  }
-
-  choices.push({
-    id: 'walletconnect',
-    type: 'walletconnect',
-    walletId: 'walletconnect',
-    label: 'WalletConnect / Mobile Wallets',
-    description: 'Best for mobile Chrome, Trust Wallet, MetaMask Mobile, and QR/deep link connection',
-    providerDetail: null,
-  });
-
-  return choices;
+export async function openAccountModal() {
+  const modal = getAppKitModal();
+  await modal.open({ view: 'Account', namespace: 'eip155' });
 }
 
-async function pickInjectedProvider(walletId = 'auto') {
-  const wallets = await getInjectedWallets();
-
-  if (!wallets.length) return null;
-
-  if (walletId !== 'auto' && walletId !== 'browser') {
-    return wallets.find((wallet) => walletMatches(wallet, walletId)) || null;
-  }
-
-  if (walletId === 'browser') {
-    return wallets.find((wallet) => !isKeplrLikeProvider(wallet) && !(isAmbiguousLegacyProvider(wallet) && hasKeplrGlobal())) || null;
-  }
-
-  return wallets.find((wallet) => !isKeplrLikeProvider(wallet) && !(isAmbiguousLegacyProvider(wallet) && hasKeplrGlobal())) || null;
-}
-
-async function refreshSignerAndContract() {
-  if (!walletState.eip1193Provider) return;
-
-  walletState.provider = new BrowserProvider(walletState.eip1193Provider);
-
-  const accounts = await walletState.eip1193Provider
-    .request({ method: 'eth_accounts' })
-    .catch(() => []);
-
-  walletState.account = accounts?.[0] || walletState.account;
-
-  if (walletState.account) {
-    walletState.signer = await walletState.provider.getSigner();
-    createContractIfReady();
-  }
-}
-
-async function connectWithEip1193Provider(providerDetail, connectionType, preapprovedAccounts = null) {
-  const eip1193Provider = providerDetail?.provider || providerDetail;
-
-  if (!eip1193Provider?.request) {
-    throw new Error('Selected wallet does not expose an EIP-1193 provider.');
-  }
-
-  walletState.eip1193Provider = eip1193Provider;
-  walletState.connectionType = connectionType;
-  walletState.walletName = providerLabel(providerDetail, connectionType);
-  walletState.provider = new BrowserProvider(eip1193Provider);
-
-  attachProviderListeners(eip1193Provider);
-
-  let accounts = preapprovedAccounts;
-
-  if (!accounts?.length) {
-    accounts = await eip1193Provider.request({ method: 'eth_requestAccounts' });
-  }
-
-  walletState.account = accounts?.[0] || '';
-
-  if (!walletState.account) {
-    throw new Error('Wallet connected, but no account was returned.');
-  }
-
-  await ensureCorrectNetwork();
-  await refreshSignerAndContract();
-
-  emitWalletChanged();
-
-  return { ...walletState };
-}
-
-function walletConnectMetadata() {
-  const basePath = import.meta.env.BASE_URL || '/';
-  const origin = isBrowser() ? window.location.origin : 'https://jefmark.github.io';
-  const normalizedBase = basePath.endsWith('/') ? basePath : `${basePath}/`;
-  const appUrl = `${origin}${normalizedBase}`;
-  const iconUrl = `${appUrl}nft/1.png`;
-
-  return {
-    name: 'Base Quest Milestones',
-    description: 'Base Mainnet NFT milestone runner game',
-    url: appUrl,
-    icons: [iconUrl],
-  };
-}
-
-async function getWalletConnectProvider() {
-  if (!CONFIG.walletConnectProjectId) {
-    throw new Error(
-      'WalletConnect Project ID is missing. Add VITE_WALLETCONNECT_PROJECT_ID in GitHub Actions variables and deploy again.'
-    );
-  }
-
-  if (!walletConnectProvider) {
-    walletConnectProvider = await EthereumProvider.init({
-      projectId: CONFIG.walletConnectProjectId,
-      metadata: walletConnectMetadata(),
-      showQrModal: true,
-      chains: [CONFIG.chainId],
-      optionalChains: [CONFIG.chainId],
-      methods: REQUIRED_WALLET_METHODS,
-      optionalMethods: REQUIRED_WALLET_METHODS,
-      events: REQUIRED_WALLET_EVENTS,
-      optionalEvents: REQUIRED_WALLET_EVENTS,
-      rpcMap: {
-        [CONFIG.chainId]: CONFIG.rpcUrl,
-      },
-      qrModalOptions: {
-        themeMode: 'dark',
-      },
-    });
-  }
-
-  return walletConnectProvider;
-}
-
-export async function connectInjectedWallet(walletId = 'auto') {
-  const providerDetail = await pickInjectedProvider(walletId);
-
-  if (!providerDetail) {
-    if (walletId === 'metamask') {
-      throw new Error('MetaMask was not found in this browser. Use WalletConnect on mobile browsers, or install MetaMask extension on desktop.');
-    }
-
-    if (walletId === 'trust') {
-      throw new Error('Trust Wallet injected provider was not found. Use WalletConnect to connect Trust Wallet on mobile.');
-    }
-
-    throw new Error('No browser wallet was found. Use WalletConnect on mobile browsers.');
-  }
-
-  return connectWithEip1193Provider(providerDetail, 'injected');
-}
-
-export async function connectWalletConnect() {
-  const provider = await getWalletConnectProvider();
-  let accounts = [];
-
-  try {
-    // enable() reliably opens the WalletConnect modal and returns accounts after approval.
-    accounts = await provider.enable();
-  } catch (err) {
-    throw normalizeRpcError(err, 'WalletConnect connection was cancelled or failed.');
-  }
-
-  return connectWithEip1193Provider(
-    {
-      provider,
-      info: {
-        name: provider.session?.peer?.metadata?.name || 'WalletConnect',
-        rdns: 'walletconnect',
-      },
-    },
-    'walletconnect',
-    accounts
-  );
-}
-
-export async function connectWallet(options = {}) {
-  const walletId = options.walletId || 'auto';
-  const providerDetail = options.providerDetail || null;
-
-  if (walletId === 'walletconnect') {
-    return connectWalletConnect();
-  }
-
-  if (providerDetail) {
-    return connectWithEip1193Provider(providerDetail, 'injected');
-  }
-
-  return connectInjectedWallet(walletId);
+export async function connectWallet() {
+  await openWalletModal();
 }
 
 export async function ensureCorrectNetwork() {
@@ -600,7 +331,7 @@ export async function ensureCorrectNetwork() {
   if (!activeProvider?.request) return false;
 
   const target = toHexChainId(CONFIG.chainId);
-  const current = await activeProvider.request({ method: 'eth_chainId' });
+  const current = await activeProvider.request({ method: 'eth_chainId' }).catch(() => null);
 
   if (normalizeHex(current) === normalizeHex(target)) {
     walletState.chainOk = true;
@@ -655,22 +386,69 @@ export async function ensureCorrectNetwork() {
   return true;
 }
 
+async function bestEffortRevokePermissions(provider) {
+  if (!provider?.request) return false;
+
+  try {
+    await provider.request({
+      method: 'wallet_revokePermissions',
+      params: [{ eth_accounts: {} }],
+    });
+    return true;
+  } catch (err) {
+    // Not all wallets support wallet_revokePermissions. AppKit/WalletConnect disconnect still runs below.
+    console.info('Wallet permission revoke is not supported or was rejected by this wallet:', err);
+    return false;
+  }
+}
+
 export async function disconnectWallet() {
   const provider = walletState.eip1193Provider;
-  const shouldDisconnectSession = walletState.connectionType === 'walletconnect';
+  let revoked = false;
 
   clearProviderListeners();
 
+  // Best effort: MetaMask and some EVM wallets support revoking eth_accounts permission.
+  // This removes the site from the wallet's connected dapps when the wallet supports it.
+  revoked = await bestEffortRevokePermissions(provider);
+
   try {
-    if (shouldDisconnectSession && provider?.disconnect) {
-      await provider.disconnect();
+    const modal = getAppKitModal();
+
+    if (typeof modal.disconnect === 'function') {
+      await modal.disconnect();
+    } else if (modal.adapter?.connectionControllerClient?.disconnect) {
+      await modal.adapter.connectionControllerClient.disconnect();
     }
   } catch (err) {
-    console.warn('WalletConnect disconnect failed:', err);
+    console.warn('AppKit disconnect failed:', err);
   }
+
+  try {
+    if (provider?.disconnect) await provider.disconnect();
+    else if (provider?.close) await provider.close();
+  } catch (err) {
+    console.warn('Provider disconnect/close failed:', err);
+  }
+
+  if (typeof unsubscribeProvider === 'function') {
+    // Keep the subscription active only by re-creating AppKit on the next open.
+    try { unsubscribeProvider(); } catch {}
+    unsubscribeProvider = null;
+  }
+
+  if (typeof unsubscribeWalletInfo === 'function') {
+    try { unsubscribeWalletInfo(); } catch {}
+    unsubscribeWalletInfo = null;
+  }
+
+  appKitModal = null;
+  lastWalletInfo = null;
 
   resetWalletState(false);
   emitWalletChanged();
+
+  return { revoked };
 }
 
 export async function getBalanceText() {
