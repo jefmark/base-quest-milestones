@@ -65,7 +65,7 @@ const KNOWN_WALLETS = [
   {
     id: 'rabby',
     name: 'Rabby Wallet',
-    subtitle: 'Desktop EVM wallet',
+    subtitle: 'Desktop EVM wallet with transaction simulation',
     rdns: ['io.rabby', 'io.rabby.wallet'],
     flags: ['isRabby'],
     desktopInstallUrl: 'https://rabby.io/',
@@ -633,7 +633,7 @@ function walletInitials(name) {
 function walletStatusLabel(wallet, installed) {
   if (wallet.id === WALLETCONNECT_ID) return 'Mobile / QR';
   if (installed) return 'Installed';
-  if (isMobile() && wallet.mobileOpenUrl) return 'Open app';
+  if (isMobile() && wallet.mobileOpenUrl) return 'Mobile ready';
   if (wallet.id === BROWSER_WALLET_ID) return installed ? 'Detected' : 'Unavailable';
   return 'Install';
 }
@@ -642,7 +642,7 @@ function walletDescription(wallet, installed) {
   if (wallet.id === WALLETCONNECT_ID) return 'Connect MetaMask, Trust Wallet, Coinbase Wallet and other EVM wallets by mobile deep link or QR.';
   if (wallet.id === BROWSER_WALLET_ID) return installed ? 'Uses the currently active injected EVM provider.' : 'No injected EVM provider was detected in this browser.';
   if (installed) return `${wallet.subtitle}. Detected in this browser.`;
-  if (isMobile() && wallet.mobileOpenUrl) return `${wallet.subtitle}. Opens the wallet app browser for this dApp.`;
+  if (isMobile() && wallet.mobileOpenUrl) return `${wallet.subtitle}. Uses WalletConnect on mobile so the game page stays open.`;
   return `${wallet.subtitle}. Not installed in this browser.`;
 }
 
@@ -732,15 +732,19 @@ async function handleWalletPick(walletId) {
     const installed = findInstalledProvider(wallet.id);
 
     if (installed) {
-      setPickerMessage(`Opening ${wallet.name}...`);
+      const riskNote = wallet.id === 'rabby'
+        ? ' Rabby may show a site popularity warning for new GitHub Pages domains; confirm only if the URL is correct.'
+        : '';
+      setPickerMessage(`Opening ${wallet.name}...${riskNote}`);
       await connectWithProvider(installed.provider, wallet.name, 'injected');
       closeWalletPicker();
       return;
     }
 
     if (isMobile() && wallet.mobileOpenUrl) {
-      setPickerMessage(`Opening ${wallet.name} app. If it is not installed, use WalletConnect.`);
-      window.location.href = wallet.mobileOpenUrl(currentDappUrl());
+      setPickerMessage(`Opening WalletConnect for ${wallet.name}. Confirm in your wallet app, then return to this page.`);
+      await connectWalletConnect();
+      closeWalletPicker();
       return;
     }
 
@@ -913,24 +917,51 @@ export async function mintMilestone(milestone, score, playSeconds) {
   }
 
   await ensureCorrectNetwork();
+  await refreshSignerAndContract();
 
-  if (!walletState.contract) {
-    createContractIfReady();
+  if (!walletState.contract || !walletState.signer) {
+    throw new Error('Wallet signer is not ready. Disconnect, reconnect, and try mint again.');
+  }
+
+  const safeMilestone = Math.floor(Number(milestone));
+  const safeScore = Math.floor(Number(score));
+  const safePlaySeconds = Math.floor(Number(playSeconds));
+
+  if (!Number.isFinite(safeMilestone) || safeMilestone < 1) {
+    throw new Error('Invalid milestone number.');
   }
 
   const alreadyMinted = await walletState.contract.hasMintedMilestone(
     walletState.account,
-    milestone
+    safeMilestone
   );
 
   if (alreadyMinted) {
     throw new Error('You already minted this milestone.');
   }
 
+  let overrides = {};
+
+  try {
+    const estimatedGas = await walletState.contract.mintMilestone.estimateGas(
+      safeMilestone,
+      safeScore,
+      safePlaySeconds
+    );
+    overrides = { gasLimit: (estimatedGas * 125n) / 100n };
+  } catch (err) {
+    const reason = err?.shortMessage || err?.reason || err?.message || '';
+    if (reason) {
+      throw new Error(`Mint simulation failed before wallet confirmation: ${reason}`);
+    }
+    throw new Error('Mint simulation failed before wallet confirmation. Check contract address, milestone status, and Base gas balance.');
+  }
+
   const tx = await walletState.contract.mintMilestone(
-    milestone,
-    Math.floor(score),
-    Math.floor(playSeconds)
+    safeMilestone,
+    safeScore,
+    safePlaySeconds,
+    overrides
   );
 
   const receipt = await tx.wait();
