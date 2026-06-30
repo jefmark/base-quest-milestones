@@ -11,6 +11,62 @@ import {
   walletState,
 } from './wallet.js';
 
+
+function installBrowserIdentity() {
+  document.title = 'Base Quest Milestones';
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#2563eb"/>
+          <stop offset="1" stop-color="#22c55e"/>
+        </linearGradient>
+      </defs>
+      <rect width="64" height="64" rx="16" fill="url(#bg)"/>
+      <circle cx="35" cy="15" r="6" fill="#fff"/>
+      <path d="M32 23 L23 33 L34 35 L43 26" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M34 35 L26 51" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+      <path d="M35 36 L49 49" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+      <path d="M23 33 L13 29" fill="none" stroke="#dbeafe" stroke-width="5" stroke-linecap="round"/>
+      <path d="M42 26 L53 22" fill="none" stroke="#dbeafe" stroke-width="5" stroke-linecap="round"/>
+    </svg>
+  `.trim();
+
+  const dataUrl = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  let icon = document.querySelector('link[rel="icon"]');
+  if (!icon) {
+    icon = document.createElement('link');
+    icon.rel = 'icon';
+    document.head.appendChild(icon);
+  }
+  icon.type = 'image/svg+xml';
+  icon.href = dataUrl;
+
+  let appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
+  if (!appleIcon) {
+    appleIcon = document.createElement('link');
+    appleIcon.rel = 'apple-touch-icon';
+    document.head.appendChild(appleIcon);
+  }
+  appleIcon.href = dataUrl;
+
+  const ensureMeta = (name, content) => {
+    let meta = document.querySelector(`meta[name="${name}"]`);
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = name;
+      document.head.appendChild(meta);
+    }
+    meta.content = content;
+  };
+
+  ensureMeta('application-name', 'Base Quest Milestones');
+  ensureMeta('theme-color', '#0f172a');
+}
+
+installBrowserIdentity();
+
 const app = document.querySelector('#app');
 
 const milestoneCards = STAGE_CONFIG.map((m) => `
@@ -217,7 +273,7 @@ async function refreshWalletUi() {
   updateWalletButtons();
 
   if (!walletState.account) {
-    walletStatus.textContent = 'Live on Base Mainnet. Connect an EVM wallet. On mobile, choose WalletConnect to keep the game page open.';
+    walletStatus.textContent = 'Live on Base Mainnet. Connect an EVM wallet. On mobile, MetaMask/Trust opens the wallet app; WalletConnect keeps this page open.';
     updateStats(lastSnapshot || game.snapshot());
     return;
   }
@@ -320,7 +376,7 @@ connectBtn.addEventListener('click', async () => {
 
   try {
     await openWalletModal();
-    walletStatus.textContent = 'Wallet list opened. Choose MetaMask, Trust Wallet, Coinbase, Rabby, or WalletConnect.';
+    walletStatus.textContent = 'Wallet list opened. On Android Chrome, choose MetaMask/Trust to open the app, or WalletConnect to stay on this page.';
   } catch (err) {
     console.error(err);
     const message = err.shortMessage || err.message || 'Could not open wallet list.';
