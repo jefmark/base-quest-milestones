@@ -7,6 +7,7 @@ import {
   disconnectWallet,
   getBalanceText,
   getWalletChoices,
+  isMobileBrowser,
   mintMilestone,
   shortAddress,
   walletState,
@@ -36,7 +37,7 @@ app.innerHTML = `
         <button id="disconnectBtn" type="button" hidden>Disconnect</button>
       </div>
       <p id="walletStatus" class="status-text">
-        Live on Base Mainnet. Choose MetaMask, Trust Wallet, browser wallet, or WalletConnect.
+        Live on Base Mainnet. One Connect Wallet button works for desktop, mobile wallet browsers, and WalletConnect.
       </p>
     </section>
 
@@ -123,14 +124,14 @@ app.innerHTML = `
         <button id="closeWalletModalBtn" type="button" class="wallet-modal__close" aria-label="Close wallet list">×</button>
       </div>
       <p class="wallet-modal__hint">
-        Choose the wallet yourself. This prevents the browser from opening the wrong wallet, such as Keplr.
+        Choose the wallet yourself. MetaMask is shown only when a verified MetaMask provider is detected, so Keplr is not opened by mistake.
       </p>
       <div id="walletChoices" class="wallet-choice-list">
         <button type="button" class="wallet-choice" disabled>Loading wallets...</button>
       </div>
       <p class="wallet-modal__small">
-        On mobile Chrome/Samsung Browser, choose WalletConnect / Mobile Wallets, then select Trust Wallet or MetaMask.
-        Inside MetaMask's own browser, MetaMask usually appears directly.
+        On mobile Chrome/Samsung Browser, the Connect button opens WalletConnect directly when no mobile wallet browser provider is detected.
+        Inside MetaMask's own browser, MetaMask usually appears as a detected wallet.
       </p>
     </section>
   </div>
@@ -350,7 +351,7 @@ async function refreshWalletUi() {
   updateWalletButtons();
 
   if (!walletState.account) {
-    walletStatus.textContent = 'Live on Base Mainnet. Click Connect Wallet and choose MetaMask, Trust Wallet, browser wallet, or WalletConnect.';
+    walletStatus.textContent = 'Live on Base Mainnet. Click Connect Wallet. On mobile Chrome it opens WalletConnect; on desktop choose the exact wallet.';
     updateStats(lastSnapshot || game.snapshot());
     return;
   }
@@ -389,9 +390,9 @@ async function renderWalletChoices() {
   }
 
   walletChoicesEl.innerHTML = currentWalletChoices.map((choice, index) => {
-    const description = choice.type === 'walletconnect'
+    const description = choice.description || (choice.type === 'walletconnect'
       ? 'Best for mobile Chrome, Trust Wallet, MetaMask Mobile, and other wallets'
-      : 'Detected in this browser';
+      : 'Detected in this browser');
 
     return `
       <button type="button" class="wallet-choice" data-wallet-choice-index="${index}">
@@ -408,8 +409,56 @@ async function renderWalletChoices() {
 async function openWalletModal() {
   if (connectInProgress || walletState.account) return;
 
+  connectInProgress = true;
+  updateWalletButtons();
+  walletStatus.textContent = 'Checking available wallets...';
+
+  let choices = [];
+
+  try {
+    choices = await getWalletChoices();
+  } catch (err) {
+    console.error(err);
+    choices = [];
+  } finally {
+    connectInProgress = false;
+    updateWalletButtons();
+  }
+
+  const walletConnectChoice = choices.find((choice) => choice.type === 'walletconnect') || {
+    id: 'walletconnect',
+    type: 'walletconnect',
+    walletId: 'walletconnect',
+    label: 'WalletConnect / Mobile Wallets',
+    providerDetail: null,
+  };
+
+  const injectedChoices = choices.filter((choice) => choice.type === 'injected');
+
+  // On normal mobile browsers there is usually no injected wallet.
+  // Opening WalletConnect directly avoids the "nothing happened" feeling.
+  if (isMobileBrowser() && injectedChoices.length === 0) {
+    await connectWithChoice(walletConnectChoice);
+    return;
+  }
+
+  currentWalletChoices = choices.length ? choices : [walletConnectChoice];
   walletModal.hidden = false;
-  await renderWalletChoices();
+  walletChoicesEl.innerHTML = currentWalletChoices.map((choice, index) => {
+    const description = choice.description || (choice.type === 'walletconnect'
+      ? 'Best for mobile Chrome, Trust Wallet, MetaMask Mobile, and other wallets'
+      : 'Detected in this browser');
+
+    return `
+      <button type="button" class="wallet-choice" data-wallet-choice-index="${index}">
+        <span>
+          ${choice.label}
+          <small>${description}</small>
+        </span>
+        <span class="wallet-choice__arrow">›</span>
+      </button>
+    `;
+  }).join('');
 }
 
 async function connectWithChoice(choice) {
