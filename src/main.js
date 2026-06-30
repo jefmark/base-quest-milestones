@@ -3,12 +3,10 @@ import './style.css';
 import { CONFIG } from './config.js';
 import { createGame, STAGE_CONFIG } from './game.js';
 import {
-  connectWallet,
   disconnectWallet,
   getBalanceText,
-  getWalletChoices,
-  isMobileBrowser,
   mintMilestone,
+  openWalletModal,
   shortAddress,
   walletState,
 } from './wallet.js';
@@ -30,14 +28,14 @@ app.innerHTML = `
       <h1>Base Quest Milestones</h1>
       <p>
         Run, jump, collect green shields, lose score on protected hits, and mint ERC-721 milestone NFTs.
-        This version uses one wallet button for desktop extensions, mobile wallet browsers, and WalletConnect.
+        Wallet connection is powered by Reown AppKit for a professional desktop and mobile wallet list.
       </p>
       <div class="actions wallet-actions">
         <button id="connectBtn" type="button">Connect Wallet</button>
         <button id="disconnectBtn" type="button" hidden>Disconnect</button>
       </div>
       <p id="walletStatus" class="status-text">
-        Live on Base Mainnet. One Connect Wallet button works for desktop, mobile wallet browsers, and WalletConnect.
+        Live on Base Mainnet. Click Connect Wallet to choose an EVM/Base wallet from the wallet list.
       </p>
     </section>
 
@@ -101,7 +99,7 @@ app.innerHTML = `
       <h2>Wallet Safety</h2>
       <p>
         This app only calls <code>mintMilestone</code>. Reject any wallet popup asking for token approval,
-        asset transfer, or unlimited permission.
+        asset transfer, unlimited permission, or anything unrelated to minting your milestone NFT.
       </p>
     </section>
 
@@ -112,137 +110,7 @@ app.innerHTML = `
       </div>
     </section>
   </main>
-
-  <div id="walletModal" class="wallet-modal" hidden>
-    <div class="wallet-modal__backdrop" data-close-wallet-modal></div>
-    <section class="wallet-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="walletModalTitle">
-      <div class="wallet-modal__header">
-        <div>
-          <p class="wallet-modal__eyebrow">Connect to Base Mainnet</p>
-          <h2 id="walletModalTitle">Choose wallet</h2>
-        </div>
-        <button id="closeWalletModalBtn" type="button" class="wallet-modal__close" aria-label="Close wallet list">×</button>
-      </div>
-      <p class="wallet-modal__hint">
-        Choose the wallet yourself. MetaMask is shown only when a verified MetaMask provider is detected, so Keplr is not opened by mistake.
-      </p>
-      <div id="walletChoices" class="wallet-choice-list">
-        <button type="button" class="wallet-choice" disabled>Loading wallets...</button>
-      </div>
-      <p class="wallet-modal__small">
-        On mobile Chrome/Samsung Browser, the Connect button opens WalletConnect directly when no mobile wallet browser provider is detected.
-        Inside MetaMask's own browser, MetaMask usually appears as a detected wallet.
-      </p>
-    </section>
-  </div>
 `;
-
-const modalStyle = document.createElement('style');
-modalStyle.textContent = `
-  .wallet-modal[hidden] { display: none !important; }
-  .wallet-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    display: grid;
-    place-items: center;
-    padding: 18px;
-  }
-  .wallet-modal__backdrop {
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.72);
-    backdrop-filter: blur(8px);
-  }
-  .wallet-modal__dialog {
-    position: relative;
-    width: min(460px, 100%);
-    max-height: min(680px, calc(100vh - 36px));
-    overflow: auto;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 22px;
-    background: #101522;
-    color: #ffffff;
-    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
-    padding: 22px;
-  }
-  .wallet-modal__header {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    align-items: flex-start;
-    margin-bottom: 12px;
-  }
-  .wallet-modal__header h2 {
-    margin: 4px 0 0;
-    font-size: 1.45rem;
-  }
-  .wallet-modal__eyebrow {
-    margin: 0;
-    font-size: 0.78rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #7dd3fc;
-  }
-  .wallet-modal__close {
-    width: 38px;
-    height: 38px;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
-    font-size: 1.45rem;
-    line-height: 1;
-    cursor: pointer;
-  }
-  .wallet-modal__hint,
-  .wallet-modal__small {
-    color: #cbd5e1;
-    line-height: 1.55;
-  }
-  .wallet-modal__small {
-    font-size: 0.86rem;
-    margin-bottom: 0;
-  }
-  .wallet-choice-list {
-    display: grid;
-    gap: 10px;
-    margin-top: 16px;
-  }
-  .wallet-choice {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    min-height: 54px;
-    padding: 14px 16px;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    background: rgba(255, 255, 255, 0.08);
-    color: #ffffff;
-    cursor: pointer;
-    font-weight: 800;
-    text-align: left;
-  }
-  .wallet-choice:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.14);
-  }
-  .wallet-choice:disabled {
-    cursor: not-allowed;
-    opacity: 0.65;
-  }
-  .wallet-choice small {
-    display: block;
-    margin-top: 3px;
-    color: #cbd5e1;
-    font-weight: 500;
-  }
-  .wallet-choice__arrow {
-    opacity: 0.72;
-  }
-`;
-document.head.appendChild(modalStyle);
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -262,13 +130,10 @@ const disconnectBtn = $('#disconnectBtn');
 const walletStatus = $('#walletStatus');
 const soundBtn = $('#soundBtn');
 const antiCheatEl = $('#antiCheat');
-const walletModal = $('#walletModal');
-const walletChoicesEl = $('#walletChoices');
-const closeWalletModalBtn = $('#closeWalletModalBtn');
 
 let lastSnapshot = null;
 let connectInProgress = false;
-let currentWalletChoices = [];
+let disconnectInProgress = false;
 
 function milestoneLabel(milestone) {
   if (!milestone) return 'None';
@@ -303,18 +168,21 @@ function updateSoundButton() {
 
 function updateWalletButtons() {
   const connected = Boolean(walletState.account);
+  const busy = connectInProgress || disconnectInProgress;
 
   connectBtn.hidden = connected;
   disconnectBtn.hidden = !connected;
-  connectBtn.disabled = connectInProgress;
-  disconnectBtn.disabled = connectInProgress;
+  connectBtn.disabled = busy;
+  disconnectBtn.disabled = busy;
 
-  connectBtn.textContent = connectInProgress ? 'Connecting...' : 'Connect Wallet';
+  connectBtn.textContent = connectInProgress ? 'Opening wallet list...' : 'Connect Wallet';
 
   if (connected) {
-    disconnectBtn.textContent = `Disconnect ${shortAddress(walletState.account)}`;
+    disconnectBtn.textContent = disconnectInProgress
+      ? 'Disconnecting...'
+      : `Disconnect ${shortAddress(walletState.account)}`;
   } else {
-    disconnectBtn.textContent = 'Disconnect';
+    disconnectBtn.textContent = disconnectInProgress ? 'Disconnecting...' : 'Disconnect';
   }
 }
 
@@ -351,7 +219,7 @@ async function refreshWalletUi() {
   updateWalletButtons();
 
   if (!walletState.account) {
-    walletStatus.textContent = 'Live on Base Mainnet. Click Connect Wallet. On mobile Chrome it opens WalletConnect; on desktop choose the exact wallet.';
+    walletStatus.textContent = 'Live on Base Mainnet. Click Connect Wallet to choose an EVM/Base wallet. Mobile opens the same wallet list with deep links.';
     updateStats(lastSnapshot || game.snapshot());
     return;
   }
@@ -359,140 +227,13 @@ async function refreshWalletUi() {
   try {
     const balance = await getBalanceText();
     const name = walletState.walletName || walletState.connectionType || 'Wallet';
-    walletStatus.textContent = `${name} connected on ${CONFIG.chainName} • ${shortAddress(walletState.account)} • ${balance}`;
+    const networkLabel = walletState.chainOk ? CONFIG.chainName : `wrong network - switch to ${CONFIG.chainName}`;
+    walletStatus.textContent = `${name} connected on ${networkLabel} • ${shortAddress(walletState.account)} • ${balance}`;
   } catch {
     walletStatus.textContent = `${CONFIG.chainName} connected • ${shortAddress(walletState.account)}`;
   }
 
   updateStats(lastSnapshot || game.snapshot());
-}
-
-function closeWalletModal() {
-  walletModal.hidden = true;
-}
-
-async function renderWalletChoices() {
-  walletChoicesEl.innerHTML = '<button type="button" class="wallet-choice" disabled>Checking wallets...</button>';
-
-  try {
-    currentWalletChoices = await getWalletChoices();
-  } catch (err) {
-    console.error(err);
-    currentWalletChoices = [
-      {
-        id: 'walletconnect',
-        type: 'walletconnect',
-        walletId: 'walletconnect',
-        label: 'WalletConnect / Mobile Wallets',
-        providerDetail: null,
-      },
-    ];
-  }
-
-  walletChoicesEl.innerHTML = currentWalletChoices.map((choice, index) => {
-    const description = choice.description || (choice.type === 'walletconnect'
-      ? 'Best for mobile Chrome, Trust Wallet, MetaMask Mobile, and other wallets'
-      : 'Detected in this browser');
-
-    return `
-      <button type="button" class="wallet-choice" data-wallet-choice-index="${index}">
-        <span>
-          ${choice.label}
-          <small>${description}</small>
-        </span>
-        <span class="wallet-choice__arrow">›</span>
-      </button>
-    `;
-  }).join('');
-}
-
-async function openWalletModal() {
-  if (connectInProgress || walletState.account) return;
-
-  connectInProgress = true;
-  updateWalletButtons();
-  walletStatus.textContent = 'Checking available wallets...';
-
-  let choices = [];
-
-  try {
-    choices = await getWalletChoices();
-  } catch (err) {
-    console.error(err);
-    choices = [];
-  } finally {
-    connectInProgress = false;
-    updateWalletButtons();
-  }
-
-  const walletConnectChoice = choices.find((choice) => choice.type === 'walletconnect') || {
-    id: 'walletconnect',
-    type: 'walletconnect',
-    walletId: 'walletconnect',
-    label: 'WalletConnect / Mobile Wallets',
-    providerDetail: null,
-  };
-
-  const injectedChoices = choices.filter((choice) => choice.type === 'injected');
-
-  // On normal mobile browsers there is usually no injected wallet.
-  // Opening WalletConnect directly avoids the "nothing happened" feeling.
-  if (isMobileBrowser() && injectedChoices.length === 0) {
-    await connectWithChoice(walletConnectChoice);
-    return;
-  }
-
-  currentWalletChoices = choices.length ? choices : [walletConnectChoice];
-  walletModal.hidden = false;
-  walletChoicesEl.innerHTML = currentWalletChoices.map((choice, index) => {
-    const description = choice.description || (choice.type === 'walletconnect'
-      ? 'Best for mobile Chrome, Trust Wallet, MetaMask Mobile, and other wallets'
-      : 'Detected in this browser');
-
-    return `
-      <button type="button" class="wallet-choice" data-wallet-choice-index="${index}">
-        <span>
-          ${choice.label}
-          <small>${description}</small>
-        </span>
-        <span class="wallet-choice__arrow">›</span>
-      </button>
-    `;
-  }).join('');
-}
-
-async function connectWithChoice(choice) {
-  if (!choice || connectInProgress) return;
-
-  connectInProgress = true;
-  updateWalletButtons();
-
-  const isWalletConnect = choice.type === 'walletconnect';
-  walletStatus.textContent = isWalletConnect
-    ? 'Opening WalletConnect. On mobile, choose Trust Wallet or MetaMask from the wallet list.'
-    : `Opening ${choice.label}...`;
-
-  try {
-    await connectWallet({
-      walletId: choice.walletId,
-      providerDetail: choice.providerDetail,
-    });
-
-    closeWalletModal();
-    await refreshWalletUi();
-
-    messageEl.textContent = CONFIG.contractAddress
-      ? 'Wallet connected. Finish a clean run to mint.'
-      : 'Wallet connected, but VITE_CONTRACT_ADDRESS is empty. Add the Base Mainnet contract address.';
-  } catch (err) {
-    console.error(err);
-    const message = err.shortMessage || err.message || 'Connection failed.';
-    walletStatus.textContent = message;
-    messageEl.textContent = message;
-  } finally {
-    connectInProgress = false;
-    updateWalletButtons();
-  }
 }
 
 const game = createGame($('#gameCanvas'), {
@@ -573,29 +314,49 @@ soundBtn.addEventListener('click', () => {
   updateSoundButton();
 });
 
-connectBtn.addEventListener('click', openWalletModal);
+connectBtn.addEventListener('click', async () => {
+  if (connectInProgress || walletState.account) return;
 
-closeWalletModalBtn.addEventListener('click', closeWalletModal);
+  connectInProgress = true;
+  updateWalletButtons();
+  walletStatus.textContent = 'Opening wallet list. Choose MetaMask, Trust Wallet, Coinbase Wallet, or another EVM wallet for Base.';
 
-walletModal.addEventListener('click', (event) => {
-  if (event.target?.matches('[data-close-wallet-modal]')) {
-    closeWalletModal();
+  try {
+    await openWalletModal();
+    walletStatus.textContent = 'Wallet list opened. Choose an EVM/Base wallet from the modal.';
+  } catch (err) {
+    console.error(err);
+    const message = err.shortMessage || err.message || 'Could not open wallet list.';
+    walletStatus.textContent = message;
+    messageEl.textContent = message;
+  } finally {
+    connectInProgress = false;
+    updateWalletButtons();
   }
 });
 
-walletChoicesEl.addEventListener('click', async (event) => {
-  const button = event.target.closest('[data-wallet-choice-index]');
-  if (!button) return;
-
-  const index = Number(button.dataset.walletChoiceIndex);
-  const choice = currentWalletChoices[index];
-  await connectWithChoice(choice);
-});
-
 disconnectBtn.addEventListener('click', async () => {
-  await disconnectWallet();
-  await refreshWalletUi();
-  messageEl.textContent = 'Wallet disconnected.';
+  if (disconnectInProgress) return;
+
+  disconnectInProgress = true;
+  updateWalletButtons();
+  walletStatus.textContent = 'Disconnecting wallet and revoking dapp permission when supported by the wallet...';
+
+  try {
+    const result = await disconnectWallet();
+    await refreshWalletUi();
+    messageEl.textContent = result?.revoked
+      ? 'Wallet disconnected and dapp account permission was revoked by the wallet.'
+      : 'Wallet disconnected from the site. If your wallet still lists this dapp, remove it from the wallet connections screen.';
+  } catch (err) {
+    console.error(err);
+    const message = err.shortMessage || err.message || 'Disconnect failed.';
+    walletStatus.textContent = message;
+    messageEl.textContent = message;
+  } finally {
+    disconnectInProgress = false;
+    updateWalletButtons();
+  }
 });
 
 mintBtn.addEventListener('click', async () => {
