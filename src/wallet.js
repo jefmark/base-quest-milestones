@@ -17,10 +17,7 @@ export const walletState = {
 let walletConnectProvider = null;
 let removeProviderListeners = [];
 
-const SUPPORTED_WALLET_METHODS = [
-  'eth_accounts',
-  'eth_requestAccounts',
-  'eth_chainId',
+const REQUIRED_WALLET_METHODS = [
   'eth_sendTransaction',
   'personal_sign',
   'eth_signTypedData',
@@ -29,7 +26,7 @@ const SUPPORTED_WALLET_METHODS = [
   'wallet_addEthereumChain',
 ];
 
-const SUPPORTED_WALLET_EVENTS = [
+const REQUIRED_WALLET_EVENTS = [
   'accountsChanged',
   'chainChanged',
   'disconnect',
@@ -43,13 +40,9 @@ function isBrowser() {
   return typeof window !== 'undefined';
 }
 
-function isMobileBrowser() {
-  if (!isBrowser()) return false;
-  return /Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
-}
-
 function emitWalletChanged() {
   if (!isBrowser()) return;
+
   window.dispatchEvent(
     new CustomEvent('bqm-wallet-changed', {
       detail: {
@@ -74,28 +67,6 @@ function normalizeRpcError(err, fallbackMessage = 'Wallet request failed.') {
   normalized.code = err?.code;
   normalized.cause = err;
   return normalized;
-}
-
-function shouldFallbackToWalletConnect(err) {
-  if (!isMobileBrowser()) return false;
-
-  const message = String(
-    err?.shortMessage || err?.message || err?.data?.message || ''
-  ).toLowerCase();
-
-  if (err?.code === 4001 || err?.code === 'ACTION_REJECTED') return false;
-
-  return (
-    message.includes('unsupported') ||
-    message.includes('not supported') ||
-    message.includes('provider') ||
-    message.includes('wallet') ||
-    message.includes('chain') ||
-    message.includes('request') ||
-    message.includes('method') ||
-    message.includes('internal') ||
-    message.includes('failed')
-  );
 }
 
 function createContractIfReady() {
@@ -190,26 +161,60 @@ function providerLabel(providerDetail, fallback = 'Injected Wallet') {
   return info?.name || providerDetail?.provider?.name || fallback;
 }
 
-function providerScore(providerDetail, preferredWallet = 'auto') {
+function providerIdentity(providerDetail) {
   const provider = providerDetail?.provider;
-  const name = String(providerDetail?.info?.name || '').toLowerCase();
+  const name = String(providerDetail?.info?.name || provider?.name || '').toLowerCase();
   const rdns = String(providerDetail?.info?.rdns || '').toLowerCase();
 
-  if (preferredWallet === 'trust') {
-    if (rdns.includes('trust') || name.includes('trust') || provider?.isTrust) return 100;
-    if (provider?.isMetaMask) return 10;
-  }
+  return { provider, name, rdns };
+}
 
-  if (preferredWallet === 'metamask') {
-    if (rdns.includes('metamask') || name.includes('metamask') || provider?.isMetaMask) return 100;
-    if (provider?.isTrust) return 10;
-  }
+function isMetaMaskProvider(providerDetail) {
+  const { provider, name, rdns } = providerIdentity(providerDetail);
+  return rdns.includes('metamask') || name.includes('metamask') || provider?.isMetaMask === true;
+}
 
-  if (rdns.includes('trust') || name.includes('trust') || provider?.isTrust) return 80;
-  if (rdns.includes('metamask') || name.includes('metamask') || provider?.isMetaMask) return 70;
-  if (rdns.includes('coinbase') || name.includes('coinbase') || provider?.isCoinbaseWallet) return 60;
+function isTrustProvider(providerDetail) {
+  const { provider, name, rdns } = providerIdentity(providerDetail);
+  return rdns.includes('trust') || name.includes('trust') || provider?.isTrust === true;
+}
 
+function isCoinbaseProvider(providerDetail) {
+  const { provider, name, rdns } = providerIdentity(providerDetail);
+  return rdns.includes('coinbase') || name.includes('coinbase') || provider?.isCoinbaseWallet === true;
+}
+
+function isKeplrLikeProvider(providerDetail) {
+  const { name, rdns } = providerIdentity(providerDetail);
+  return rdns.includes('keplr') || name.includes('keplr');
+}
+
+function walletMatches(providerDetail, walletId) {
+  if (walletId === 'metamask') return isMetaMaskProvider(providerDetail);
+  if (walletId === 'trust') return isTrustProvider(providerDetail);
+  if (walletId === 'coinbase') return isCoinbaseProvider(providerDetail);
+  return false;
+}
+
+function providerScore(providerDetail) {
+  if (isMetaMaskProvider(providerDetail)) return 100;
+  if (isTrustProvider(providerDetail)) return 95;
+  if (isCoinbaseProvider(providerDetail)) return 90;
+  if (isKeplrLikeProvider(providerDetail)) return 5;
   return 50;
+}
+
+function providerKey(providerDetail, fallbackIndex = 0) {
+  const { provider } = providerIdentity(providerDetail);
+
+  return (
+    providerDetail?.info?.uuid ||
+    providerDetail?.info?.rdns ||
+    providerDetail?.info?.name ||
+    provider?.id ||
+    provider?.name ||
+    `wallet-${fallbackIndex}`
+  );
 }
 
 export function shortAddress(address) {
@@ -223,14 +228,9 @@ export async function getInjectedWallets() {
   const providers = new Map();
 
   function addProvider(detail) {
-    if (!detail?.provider) return;
+    if (!detail?.provider?.request) return;
 
-    const key =
-      detail.info?.uuid ||
-      detail.info?.rdns ||
-      detail.info?.name ||
-      String(providers.size + 1);
-
+    const key = providerKey(detail, providers.size + 1);
     providers.set(key, detail);
   }
 
@@ -241,11 +241,11 @@ export async function getInjectedWallets() {
   window.addEventListener('eip6963:announceProvider', onProvider);
   window.dispatchEvent(new Event('eip6963:requestProvider'));
 
-  await delay(350);
+  await delay(450);
 
   window.removeEventListener('eip6963:announceProvider', onProvider);
 
-  if (window.ethereum) {
+  if (window.ethereum?.request) {
     if (Array.isArray(window.ethereum.providers)) {
       for (const provider of window.ethereum.providers) {
         addProvider({
@@ -283,17 +283,88 @@ export async function getInjectedWallets() {
     }
   }
 
-  return Array.from(providers.values());
+  return Array.from(providers.values())
+    .sort((a, b) => providerScore(b) - providerScore(a));
 }
 
-async function pickInjectedProvider(preferredWallet = 'auto') {
+export async function getWalletChoices() {
+  const injectedWallets = await getInjectedWallets();
+  const choices = [];
+  const usedKeys = new Set();
+
+  function pushInjectedChoice(walletId, label, providerDetail) {
+    if (!providerDetail) return;
+
+    const key = providerKey(providerDetail, choices.length + 1);
+    if (usedKeys.has(key)) return;
+
+    usedKeys.add(key);
+    choices.push({
+      id: `${walletId}:${key}`,
+      type: 'injected',
+      walletId,
+      label,
+      providerDetail,
+    });
+  }
+
+  pushInjectedChoice(
+    'metamask',
+    'MetaMask',
+    injectedWallets.find(isMetaMaskProvider)
+  );
+
+  pushInjectedChoice(
+    'trust',
+    'Trust Wallet',
+    injectedWallets.find(isTrustProvider)
+  );
+
+  pushInjectedChoice(
+    'coinbase',
+    'Coinbase Wallet',
+    injectedWallets.find(isCoinbaseProvider)
+  );
+
+  for (const detail of injectedWallets) {
+    if (isMetaMaskProvider(detail) || isTrustProvider(detail) || isCoinbaseProvider(detail)) {
+      continue;
+    }
+
+    // Keplr is usually not the wallet the user wants for a Base EVM dApp. Do not auto-show it
+    // unless it is the only EIP-1193 provider in the browser.
+    if (isKeplrLikeProvider(detail) && injectedWallets.length > 1) {
+      continue;
+    }
+
+    pushInjectedChoice('browser', providerLabel(detail, 'Browser Wallet'), detail);
+  }
+
+  choices.push({
+    id: 'walletconnect',
+    type: 'walletconnect',
+    walletId: 'walletconnect',
+    label: 'WalletConnect / Mobile Wallets',
+    providerDetail: null,
+  });
+
+  return choices;
+}
+
+async function pickInjectedProvider(walletId = 'auto') {
   const wallets = await getInjectedWallets();
 
   if (!wallets.length) return null;
 
-  return wallets.sort(
-    (a, b) => providerScore(b, preferredWallet) - providerScore(a, preferredWallet)
-  )[0];
+  if (walletId !== 'auto' && walletId !== 'browser') {
+    return wallets.find((wallet) => walletMatches(wallet, walletId)) || null;
+  }
+
+  if (walletId === 'browser') {
+    return wallets.find((wallet) => !isKeplrLikeProvider(wallet)) || wallets[0] || null;
+  }
+
+  return wallets.find((wallet) => !isKeplrLikeProvider(wallet)) || wallets[0] || null;
 }
 
 async function refreshSignerAndContract() {
@@ -313,7 +384,7 @@ async function refreshSignerAndContract() {
   }
 }
 
-async function connectWithEip1193Provider(providerDetail, connectionType) {
+async function connectWithEip1193Provider(providerDetail, connectionType, preapprovedAccounts = null) {
   const eip1193Provider = providerDetail?.provider || providerDetail;
 
   if (!eip1193Provider?.request) {
@@ -327,7 +398,12 @@ async function connectWithEip1193Provider(providerDetail, connectionType) {
 
   attachProviderListeners(eip1193Provider);
 
-  const accounts = await eip1193Provider.request({ method: 'eth_requestAccounts' });
+  let accounts = preapprovedAccounts;
+
+  if (!accounts?.length) {
+    accounts = await eip1193Provider.request({ method: 'eth_requestAccounts' });
+  }
+
   walletState.account = accounts?.[0] || '';
 
   if (!walletState.account) {
@@ -360,7 +436,7 @@ function walletConnectMetadata() {
 async function getWalletConnectProvider() {
   if (!CONFIG.walletConnectProjectId) {
     throw new Error(
-      'WalletConnect Project ID is missing. Add VITE_WALLETCONNECT_PROJECT_ID in your GitHub Actions variables or .env file.'
+      'WalletConnect Project ID is missing. Add VITE_WALLETCONNECT_PROJECT_ID in GitHub Actions variables and deploy again.'
     );
   }
 
@@ -369,9 +445,12 @@ async function getWalletConnectProvider() {
       projectId: CONFIG.walletConnectProjectId,
       metadata: walletConnectMetadata(),
       showQrModal: true,
+      chains: [CONFIG.chainId],
       optionalChains: [CONFIG.chainId],
-      optionalMethods: SUPPORTED_WALLET_METHODS,
-      optionalEvents: SUPPORTED_WALLET_EVENTS,
+      methods: REQUIRED_WALLET_METHODS,
+      optionalMethods: REQUIRED_WALLET_METHODS,
+      events: REQUIRED_WALLET_EVENTS,
+      optionalEvents: REQUIRED_WALLET_EVENTS,
       rpcMap: {
         [CONFIG.chainId]: CONFIG.rpcUrl,
       },
@@ -384,11 +463,19 @@ async function getWalletConnectProvider() {
   return walletConnectProvider;
 }
 
-export async function connectInjectedWallet(preferredWallet = 'auto') {
-  const providerDetail = await pickInjectedProvider(preferredWallet);
+export async function connectInjectedWallet(walletId = 'auto') {
+  const providerDetail = await pickInjectedProvider(walletId);
 
   if (!providerDetail) {
-    throw new Error('No injected wallet was found in this browser. Use WalletConnect on mobile browsers.');
+    if (walletId === 'metamask') {
+      throw new Error('MetaMask was not found in this browser. Use WalletConnect on mobile browsers, or install MetaMask extension on desktop.');
+    }
+
+    if (walletId === 'trust') {
+      throw new Error('Trust Wallet injected provider was not found. Use WalletConnect to connect Trust Wallet on mobile.');
+    }
+
+    throw new Error('No browser wallet was found. Use WalletConnect on mobile browsers.');
   }
 
   return connectWithEip1193Provider(providerDetail, 'injected');
@@ -396,9 +483,13 @@ export async function connectInjectedWallet(preferredWallet = 'auto') {
 
 export async function connectWalletConnect() {
   const provider = await getWalletConnectProvider();
+  let accounts = [];
 
-  if (!provider.session) {
-    await provider.connect();
+  try {
+    // enable() reliably opens the WalletConnect modal and returns accounts after approval.
+    accounts = await provider.enable();
+  } catch (err) {
+    throw normalizeRpcError(err, 'WalletConnect connection was cancelled or failed.');
   }
 
   return connectWithEip1193Provider(
@@ -409,37 +500,24 @@ export async function connectWalletConnect() {
         rdns: 'walletconnect',
       },
     },
-    'walletconnect'
+    'walletconnect',
+    accounts
   );
 }
 
 export async function connectWallet(options = {}) {
-  const preferredWallet = options.preferredWallet || 'auto';
-  const mode = options.mode || 'auto';
+  const walletId = options.walletId || 'auto';
+  const providerDetail = options.providerDetail || null;
 
-  if (mode === 'walletconnect') {
+  if (walletId === 'walletconnect') {
     return connectWalletConnect();
   }
 
-  if (mode === 'injected') {
-    return connectInjectedWallet(preferredWallet);
+  if (providerDetail) {
+    return connectWithEip1193Provider(providerDetail, 'injected');
   }
 
-  const injected = await pickInjectedProvider(preferredWallet);
-
-  if (injected) {
-    try {
-      return await connectWithEip1193Provider(injected, 'injected');
-    } catch (err) {
-      if (!shouldFallbackToWalletConnect(err)) {
-        throw normalizeRpcError(err, 'Injected wallet connection failed.');
-      }
-
-      console.warn('Injected mobile wallet failed. Falling back to WalletConnect.', err);
-    }
-  }
-
-  return connectWalletConnect();
+  return connectInjectedWallet(walletId);
 }
 
 export async function ensureCorrectNetwork() {
