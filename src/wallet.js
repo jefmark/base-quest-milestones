@@ -40,6 +40,15 @@ function isBrowser() {
   return typeof window !== 'undefined';
 }
 
+export function isMobileBrowser() {
+  if (!isBrowser()) return false;
+
+  const ua = navigator.userAgent || '';
+  const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches;
+
+  return /Android|iPhone|iPad|iPod/i.test(ua) || Boolean(coarsePointer && window.innerWidth <= 900);
+}
+
 function emitWalletChanged() {
   if (!isBrowser()) return;
 
@@ -165,28 +174,67 @@ function providerIdentity(providerDetail) {
   const provider = providerDetail?.provider;
   const name = String(providerDetail?.info?.name || provider?.name || '').toLowerCase();
   const rdns = String(providerDetail?.info?.rdns || '').toLowerCase();
+  const source = String(providerDetail?.source || '').toLowerCase();
 
-  return { provider, name, rdns };
+  return { provider, name, rdns, source };
+}
+
+function hasKeplrGlobal() {
+  if (!isBrowser()) return false;
+  return Boolean(window.keplr || window.getOfflineSigner || window.keplrEthereum || window.leap);
+}
+
+function isKeplrLikeProvider(providerDetail) {
+  const { provider, name, rdns } = providerIdentity(providerDetail);
+
+  return (
+    rdns.includes('keplr') ||
+    rdns.includes('chainapsis') ||
+    name.includes('keplr') ||
+    provider?.isKeplr === true ||
+    provider?.keplr === true
+  );
+}
+
+function isVerifiedEip6963Provider(providerDetail) {
+  return providerDetail?.source === 'eip6963' && Boolean(providerDetail?.info?.rdns || providerDetail?.info?.name);
+}
+
+function isAmbiguousLegacyProvider(providerDetail) {
+  const { source, rdns } = providerIdentity(providerDetail);
+  return source.startsWith('legacy') && (!rdns || rdns === 'injected' || rdns === 'legacy.injected');
 }
 
 function isMetaMaskProvider(providerDetail) {
   const { provider, name, rdns } = providerIdentity(providerDetail);
-  return rdns.includes('metamask') || name.includes('metamask') || provider?.isMetaMask === true;
+
+  if (isKeplrLikeProvider(providerDetail)) return false;
+  if (rdns.includes('metamask') || name.includes('metamask')) return true;
+
+  // Some non-MetaMask wallets expose isMetaMask=true for compatibility.
+  // Do not trust this flag when Keplr is installed, because Keplr can hijack
+  // the legacy window.ethereum route and open itself when the user expects MetaMask.
+  if (provider?.isMetaMask === true) {
+    return !hasKeplrGlobal() || isMobileBrowser() || isVerifiedEip6963Provider(providerDetail);
+  }
+
+  return false;
 }
 
 function isTrustProvider(providerDetail) {
   const { provider, name, rdns } = providerIdentity(providerDetail);
+
+  if (isKeplrLikeProvider(providerDetail)) return false;
+
   return rdns.includes('trust') || name.includes('trust') || provider?.isTrust === true;
 }
 
 function isCoinbaseProvider(providerDetail) {
   const { provider, name, rdns } = providerIdentity(providerDetail);
-  return rdns.includes('coinbase') || name.includes('coinbase') || provider?.isCoinbaseWallet === true;
-}
 
-function isKeplrLikeProvider(providerDetail) {
-  const { name, rdns } = providerIdentity(providerDetail);
-  return rdns.includes('keplr') || name.includes('keplr');
+  if (isKeplrLikeProvider(providerDetail)) return false;
+
+  return rdns.includes('coinbase') || name.includes('coinbase') || provider?.isCoinbaseWallet === true;
 }
 
 function walletMatches(providerDetail, walletId) {
@@ -200,7 +248,8 @@ function providerScore(providerDetail) {
   if (isMetaMaskProvider(providerDetail)) return 100;
   if (isTrustProvider(providerDetail)) return 95;
   if (isCoinbaseProvider(providerDetail)) return 90;
-  if (isKeplrLikeProvider(providerDetail)) return 5;
+  if (isKeplrLikeProvider(providerDetail)) return 1;
+  if (isAmbiguousLegacyProvider(providerDetail) && hasKeplrGlobal()) return 2;
   return 50;
 }
 
@@ -213,8 +262,30 @@ function providerKey(providerDetail, fallbackIndex = 0) {
     providerDetail?.info?.name ||
     provider?.id ||
     provider?.name ||
-    `wallet-${fallbackIndex}`
+    `${providerDetail?.source || 'wallet'}-${fallbackIndex}`
   );
+}
+
+function legacyProviderInfo(provider) {
+  if (provider?.isTrust) {
+    return { name: 'Trust Wallet', rdns: 'com.trustwallet.app' };
+  }
+
+  if (provider?.isCoinbaseWallet) {
+    return { name: 'Coinbase Wallet', rdns: 'com.coinbase.wallet' };
+  }
+
+  // Only call a legacy provider MetaMask when it is not ambiguous.
+  // Keplr and a few other wallets may set isMetaMask=true for compatibility.
+  if (provider?.isMetaMask && !hasKeplrGlobal()) {
+    return { name: 'MetaMask', rdns: 'io.metamask' };
+  }
+
+  if (provider?.isKeplr || hasKeplrGlobal()) {
+    return { name: 'Keplr / Ambiguous Browser Wallet', rdns: 'legacy.injected' };
+  }
+
+  return { name: 'Browser Wallet', rdns: 'legacy.injected' };
 }
 
 export function shortAddress(address) {
@@ -226,59 +297,52 @@ export async function getInjectedWallets() {
   if (!isBrowser()) return [];
 
   const providers = new Map();
+  let sawEip6963 = false;
 
   function addProvider(detail) {
     if (!detail?.provider?.request) return;
 
-    const key = providerKey(detail, providers.size + 1);
-    providers.set(key, detail);
+    const normalized = {
+      ...detail,
+      info: detail.info || legacyProviderInfo(detail.provider),
+      source: detail.source || 'unknown',
+    };
+
+    const key = providerKey(normalized, providers.size + 1);
+    providers.set(key, normalized);
   }
 
   function onProvider(event) {
-    addProvider(event.detail);
+    sawEip6963 = true;
+    addProvider({
+      ...event.detail,
+      source: 'eip6963',
+    });
   }
 
   window.addEventListener('eip6963:announceProvider', onProvider);
   window.dispatchEvent(new Event('eip6963:requestProvider'));
 
-  await delay(450);
+  await delay(650);
 
   window.removeEventListener('eip6963:announceProvider', onProvider);
 
-  if (window.ethereum?.request) {
+  // Prefer EIP-6963 because it lets us target the exact wallet the user chose.
+  // The legacy window.ethereum fallback is ambiguous when several wallets are installed.
+  if (!sawEip6963 && window.ethereum?.request) {
     if (Array.isArray(window.ethereum.providers)) {
       for (const provider of window.ethereum.providers) {
         addProvider({
           provider,
-          info: {
-            name:
-              provider.isTrust ? 'Trust Wallet' :
-              provider.isMetaMask ? 'MetaMask' :
-              provider.isCoinbaseWallet ? 'Coinbase Wallet' :
-              'Injected Wallet',
-            rdns:
-              provider.isTrust ? 'com.trustwallet.app' :
-              provider.isMetaMask ? 'io.metamask' :
-              provider.isCoinbaseWallet ? 'com.coinbase.wallet' :
-              'injected',
-          },
+          info: legacyProviderInfo(provider),
+          source: 'legacy-providers',
         });
       }
     } else {
       addProvider({
         provider: window.ethereum,
-        info: {
-          name:
-            window.ethereum.isTrust ? 'Trust Wallet' :
-            window.ethereum.isMetaMask ? 'MetaMask' :
-            window.ethereum.isCoinbaseWallet ? 'Coinbase Wallet' :
-            'Injected Wallet',
-          rdns:
-            window.ethereum.isTrust ? 'com.trustwallet.app' :
-            window.ethereum.isMetaMask ? 'io.metamask' :
-            window.ethereum.isCoinbaseWallet ? 'com.coinbase.wallet' :
-            'injected',
-        },
+        info: legacyProviderInfo(window.ethereum),
+        source: 'legacy-window',
       });
     }
   }
@@ -292,7 +356,7 @@ export async function getWalletChoices() {
   const choices = [];
   const usedKeys = new Set();
 
-  function pushInjectedChoice(walletId, label, providerDetail) {
+  function pushInjectedChoice(walletId, label, providerDetail, description = 'Detected in this browser') {
     if (!providerDetail) return;
 
     const key = providerKey(providerDetail, choices.length + 1);
@@ -304,6 +368,7 @@ export async function getWalletChoices() {
       type: 'injected',
       walletId,
       label,
+      description,
       providerDetail,
     });
   }
@@ -311,19 +376,22 @@ export async function getWalletChoices() {
   pushInjectedChoice(
     'metamask',
     'MetaMask',
-    injectedWallets.find(isMetaMaskProvider)
+    injectedWallets.find(isMetaMaskProvider),
+    'Verified browser provider. This will not use Keplr.'
   );
 
   pushInjectedChoice(
     'trust',
     'Trust Wallet',
-    injectedWallets.find(isTrustProvider)
+    injectedWallets.find(isTrustProvider),
+    'Detected in this browser. On mobile Chrome, use WalletConnect instead.'
   );
 
   pushInjectedChoice(
     'coinbase',
     'Coinbase Wallet',
-    injectedWallets.find(isCoinbaseProvider)
+    injectedWallets.find(isCoinbaseProvider),
+    'Detected in this browser'
   );
 
   for (const detail of injectedWallets) {
@@ -331,13 +399,18 @@ export async function getWalletChoices() {
       continue;
     }
 
-    // Keplr is usually not the wallet the user wants for a Base EVM dApp. Do not auto-show it
-    // unless it is the only EIP-1193 provider in the browser.
-    if (isKeplrLikeProvider(detail) && injectedWallets.length > 1) {
+    // Do not show Keplr or ambiguous legacy providers for a Base EVM dApp.
+    // They are the reason the wrong wallet opens when the user expects MetaMask.
+    if (isKeplrLikeProvider(detail) || (isAmbiguousLegacyProvider(detail) && hasKeplrGlobal())) {
       continue;
     }
 
-    pushInjectedChoice('browser', providerLabel(detail, 'Browser Wallet'), detail);
+    pushInjectedChoice(
+      'browser',
+      providerLabel(detail, 'Browser Wallet'),
+      detail,
+      'Detected browser wallet provider'
+    );
   }
 
   choices.push({
@@ -345,6 +418,7 @@ export async function getWalletChoices() {
     type: 'walletconnect',
     walletId: 'walletconnect',
     label: 'WalletConnect / Mobile Wallets',
+    description: 'Best for mobile Chrome, Trust Wallet, MetaMask Mobile, and QR/deep link connection',
     providerDetail: null,
   });
 
@@ -361,10 +435,10 @@ async function pickInjectedProvider(walletId = 'auto') {
   }
 
   if (walletId === 'browser') {
-    return wallets.find((wallet) => !isKeplrLikeProvider(wallet)) || wallets[0] || null;
+    return wallets.find((wallet) => !isKeplrLikeProvider(wallet) && !(isAmbiguousLegacyProvider(wallet) && hasKeplrGlobal())) || null;
   }
 
-  return wallets.find((wallet) => !isKeplrLikeProvider(wallet)) || wallets[0] || null;
+  return wallets.find((wallet) => !isKeplrLikeProvider(wallet) && !(isAmbiguousLegacyProvider(wallet) && hasKeplrGlobal())) || null;
 }
 
 async function refreshSignerAndContract() {
