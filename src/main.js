@@ -15,99 +15,102 @@ const app = document.querySelector('#app');
 
 const milestoneCards = STAGE_CONFIG.map((m) => `
   <article class="milestone-card">
-    <div class="milestone-number">${m.milestone}</div>
+    <div class="milestone-topline">
+      <span class="milestone-number">${m.milestone}</span>
+      <span class="milestone-pill">${m.minPlaySeconds}s</span>
+    </div>
     <h3>${m.name}</h3>
-    <p>${m.score.toLocaleString()} score • ${m.minPlaySeconds}s</p>
+    <p>${m.score.toLocaleString()} score required</p>
   </article>
 `).join('');
 
 app.innerHTML = `
   <main class="shell">
-    <section class="hero">
-      <p class="eyebrow">Base • NFT Milestone Runner</p>
-      <h1>Base Quest Milestones</h1>
-      <p>
-        Run, jump, collect green shields, lose score on protected hits, and mint ERC-721 milestone NFTs.
-        Wallet connection is powered by Reown AppKit for a professional desktop and mobile wallet list.
-      </p>
-      <div class="actions wallet-actions">
-        <button id="connectBtn" type="button">Connect Wallet</button>
-        <button id="disconnectBtn" type="button" hidden>Disconnect</button>
+    <section class="hero-card">
+      <div class="hero-copy">
+        <p class="eyebrow">Base Mainnet • ERC-721 Runner</p>
+        <h1>Base Quest Milestones</h1>
+        <p class="hero-text">
+          Play a clean run, unlock a milestone, then mint the matching NFT on Base.
+          The wallet picker is EVM-only and supports desktop extensions plus mobile WalletConnect.
+        </p>
+        <div class="actions wallet-actions">
+          <button id="connectBtn" class="primary-action" type="button">Connect Wallet</button>
+          <button id="disconnectBtn" class="ghost-action" type="button" hidden>Disconnect</button>
+        </div>
+        <p id="walletStatus" class="status-text">
+          Live on Base Mainnet. Connect an EVM wallet to mint unlocked milestones.
+        </p>
       </div>
-      <p id="walletStatus" class="status-text">
-        Live on Base Mainnet. Click Connect Wallet to choose an EVM/Base wallet from the wallet list.
-      </p>
+      <div class="hero-side" aria-hidden="true">
+        <div class="orb orb-one"></div>
+        <div class="orb orb-two"></div>
+        <div class="chain-card">
+          <span>Network</span>
+          <strong>Base</strong>
+        </div>
+        <div class="chain-card muted">
+          <span>Mint Type</span>
+          <strong>Milestone NFT</strong>
+        </div>
+      </div>
     </section>
 
     <section class="game-panel">
-      <canvas id="gameCanvas" width="960" height="420" aria-label="Base Quest runner game"></canvas>
-      <div class="game-controls">
-        <button id="startBtn" type="button">Start / Restart</button>
-        <button id="jumpBtn" type="button">Jump</button>
-        <button id="soundBtn" type="button">Sound: On</button>
-        <button id="mintBtn" type="button" disabled>Mint NFT Locked</button>
+      <div class="game-panel-head">
+        <div>
+          <p class="eyebrow">Clean run required</p>
+          <h2>Runner Arena</h2>
+        </div>
+        <div class="game-controls">
+          <button id="startBtn" type="button">Start / Restart</button>
+          <button id="jumpBtn" type="button">Jump</button>
+          <button id="soundBtn" type="button">Sound: On</button>
+        </div>
       </div>
-      <p id="message" class="message">
-        Anti-cheat rule: mint is allowed only after a finished clean run.
-      </p>
+      <canvas id="gameCanvas" width="960" height="420" aria-label="Base Quest runner game"></canvas>
+      <div class="mint-bar">
+        <p id="message" class="message">Finish a clean run to unlock minting.</p>
+        <button id="mintBtn" class="mint-action" type="button" disabled>Mint NFT Locked</button>
+      </div>
     </section>
 
     <section class="stats-grid" aria-label="Run statistics">
-      <article>
-        <span>Score</span>
-        <strong id="score">0</strong>
+      <article><span>Score</span><strong id="score">0</strong></article>
+      <article><span>Best</span><strong id="best">0</strong></article>
+      <article><span>Stage</span><strong id="stage">Rookie Runner</strong></article>
+      <article><span>Score Unlocked</span><strong id="unlocked">None</strong></article>
+      <article><span>Mintable NFT</span><strong id="mintable">None</strong></article>
+      <article><span>Play Time</span><strong id="seconds">0s</strong></article>
+      <article><span>Protected Hit Penalty</span><strong id="penalty">-100</strong></article>
+      <article><span>Last Hit</span><strong id="lastPenalty">None</strong></article>
+      <article><span>Anti-Cheat</span><strong id="antiCheat">Not started</strong></article>
+      <article class="wide"><span>Next Requirement</span><strong id="requirement">1,200 score • 20s</strong></article>
+    </section>
+
+    <section class="info-grid">
+      <article class="safety-card">
+        <h2>Wallet Safety</h2>
+        <p>
+          This app only calls <code>mintMilestone</code>. Reject approvals, transfers, unlimited permissions,
+          or any wallet popup unrelated to milestone minting.
+        </p>
       </article>
-      <article>
-        <span>Best</span>
-        <strong id="best">0</strong>
-      </article>
-      <article>
-        <span>Stage</span>
-        <strong id="stage">Rookie Runner</strong>
-      </article>
-      <article>
-        <span>Score Unlocked</span>
-        <strong id="unlocked">None</strong>
-      </article>
-      <article>
-        <span>Mintable NFT</span>
-        <strong id="mintable">None</strong>
-      </article>
-      <article>
-        <span>Play Time</span>
-        <strong id="seconds">0s</strong>
-      </article>
-      <article>
-        <span>Protected Hit Penalty</span>
-        <strong id="penalty">-100</strong>
-      </article>
-      <article>
-        <span>Last Hit</span>
-        <strong id="lastPenalty">None</strong>
-      </article>
-      <article>
-        <span>Anti-Cheat</span>
-        <strong id="antiCheat">Not started</strong>
-      </article>
-      <article class="wide">
-        <span>Next Requirement</span>
-        <strong id="requirement">1,200 score • 20s</strong>
+      <article class="safety-card">
+        <h2>Mint Protection</h2>
+        <p>
+          If an NFT becomes mintable, accidental Space/tap/canvas clicks will not restart the game.
+          Only the Start / Restart button can begin a new run after mint unlock.
+        </p>
       </article>
     </section>
 
-    <section class="safety-card">
-      <h2>Wallet Safety</h2>
-      <p>
-        This app only calls <code>mintMilestone</code>. Reject any wallet popup asking for token approval,
-        asset transfer, unlimited permission, or anything unrelated to minting your milestone NFT.
-      </p>
-    </section>
-
-    <section>
-      <h2>Milestones</h2>
-      <div class="milestones">
-        ${milestoneCards}
+    <section class="milestone-section">
+      <div class="section-title">
+        <p class="eyebrow">Onchain progress</p>
+        <h2>Milestones</h2>
       </div>
+      <div class="milestones">${milestoneCards}</div>
     </section>
   </main>
 `;
@@ -134,6 +137,8 @@ const antiCheatEl = $('#antiCheat');
 let lastSnapshot = null;
 let connectInProgress = false;
 let disconnectInProgress = false;
+let mintInProgress = false;
+let mintedMilestones = new Set();
 
 function milestoneLabel(milestone) {
   if (!milestone) return 'None';
@@ -142,24 +147,13 @@ function milestoneLabel(milestone) {
 
 function requirementText(snapshot) {
   const next = snapshot.nextRequirement;
-
-  if (!next) {
-    return 'All milestones unlocked';
-  }
+  if (!next) return 'All milestones unlocked';
 
   const missing = [];
+  if (next.remainingScore > 0) missing.push(`${next.remainingScore.toLocaleString()} more score`);
+  if (next.remainingSeconds > 0) missing.push(`${next.remainingSeconds}s more play time`);
 
-  if (next.remainingScore > 0) {
-    missing.push(`${next.remainingScore.toLocaleString()} more score`);
-  }
-
-  if (next.remainingSeconds > 0) {
-    missing.push(`${next.remainingSeconds}s more play time`);
-  }
-
-  return `#${next.milestone} ${next.name}: ${next.score.toLocaleString()} score • ${next.minPlaySeconds}s${
-    missing.length ? ` (${missing.join(' + ')})` : ''
-  }`;
+  return `#${next.milestone} ${next.name}: ${next.score.toLocaleString()} score • ${next.minPlaySeconds}s${missing.length ? ` (${missing.join(' + ')})` : ''}`;
 }
 
 function updateSoundButton() {
@@ -168,7 +162,7 @@ function updateSoundButton() {
 
 function updateWalletButtons() {
   const connected = Boolean(walletState.account);
-  const busy = connectInProgress || disconnectInProgress;
+  const busy = connectInProgress || disconnectInProgress || mintInProgress;
 
   connectBtn.hidden = connected;
   disconnectBtn.hidden = !connected;
@@ -176,37 +170,41 @@ function updateWalletButtons() {
   disconnectBtn.disabled = busy;
 
   connectBtn.textContent = connectInProgress ? 'Opening wallet list...' : 'Connect Wallet';
-
-  if (connected) {
-    disconnectBtn.textContent = disconnectInProgress
-      ? 'Disconnecting...'
-      : `Disconnect ${shortAddress(walletState.account)}`;
-  } else {
-    disconnectBtn.textContent = disconnectInProgress ? 'Disconnecting...' : 'Disconnect';
-  }
+  disconnectBtn.textContent = connected
+    ? (disconnectInProgress ? 'Disconnecting...' : `Disconnect ${shortAddress(walletState.account)}`)
+    : 'Disconnect';
 }
 
 function updateMintButton(snapshot) {
   const mintable = snapshot?.mintableMilestone;
+  const alreadyMintedLocally = mintable ? mintedMilestones.has(mintable.milestone) : false;
   const canMint = Boolean(
     CONFIG.contractAddress &&
     walletState.account &&
     mintable &&
-    snapshot.mintAllowed
+    snapshot.mintAllowed &&
+    !mintInProgress &&
+    !alreadyMintedLocally
   );
 
   mintBtn.disabled = !canMint;
 
+  if (mintInProgress) {
+    mintBtn.textContent = 'Waiting for wallet...';
+    return;
+  }
   if (!mintable) {
     mintBtn.textContent = 'Mint NFT Locked';
     return;
   }
-
+  if (alreadyMintedLocally) {
+    mintBtn.textContent = `Minted #${mintable.milestone}`;
+    return;
+  }
   if (!walletState.account) {
     mintBtn.textContent = `Connect wallet to mint #${mintable.milestone}`;
     return;
   }
-
   if (!snapshot.mintAllowed) {
     mintBtn.textContent = `Mint locked: #${mintable.milestone}`;
     return;
@@ -219,7 +217,7 @@ async function refreshWalletUi() {
   updateWalletButtons();
 
   if (!walletState.account) {
-    walletStatus.textContent = 'Live on Base Mainnet. Click Connect Wallet to choose an EVM/Base wallet. Mobile opens the same wallet list with deep links.';
+    walletStatus.textContent = 'Live on Base Mainnet. Connect an EVM wallet. On mobile, choose WalletConnect to keep the game page open.';
     updateStats(lastSnapshot || game.snapshot());
     return;
   }
@@ -238,34 +236,27 @@ async function refreshWalletUi() {
 
 const game = createGame($('#gameCanvas'), {
   onUpdate: updateStats,
-
   onMilestone(snapshot) {
     updateStats(snapshot);
   },
-
   onPenalty(snapshot, amount, row) {
     updateStats(snapshot);
     messageEl.textContent = `Shield protected you. -${amount.toLocaleString()} score in ${row.label}.`;
   },
-
   onCheatFlag(snapshot, code, detail) {
     updateStats(snapshot);
     messageEl.textContent = `Anti-cheat blocked this run: ${code}. ${detail || 'Restart required.'}`;
   },
-
   onGameOver(snapshot) {
     updateStats(snapshot);
-
     if (snapshot.mintAllowed && snapshot.mintableMilestone) {
-      messageEl.textContent = `${milestoneLabel(snapshot.mintableMilestone)} is ready to mint. Final play time: ${snapshot.playSeconds}s.`;
+      messageEl.textContent = `${milestoneLabel(snapshot.mintableMilestone)} is ready to mint. Accidental Space/tap will not restart this run. Use Mint NFT or press Start / Restart for a new run.`;
       return;
     }
-
     if (snapshot.mintableMilestone && !snapshot.mintAllowed) {
       messageEl.textContent = `NFT score/time reached, but mint is blocked. ${snapshot.mintBlockedReason}`;
       return;
     }
-
     messageEl.textContent = `Game over. NFT mint is locked. ${requirementText(snapshot)}`;
   },
 });
@@ -286,13 +277,15 @@ function updateStats(snapshot) {
 
   updateMintButton(snapshot);
 
+  if (mintInProgress) return;
+
   if (snapshot.antiCheat && !snapshot.antiCheat.clean) {
     messageEl.textContent = `${snapshot.antiCheat.status} Start a new run to mint.`;
     return;
   }
 
   if (snapshot.mintableMilestone && snapshot.mintAllowed) {
-    messageEl.textContent = `${milestoneLabel(snapshot.mintableMilestone)} is mintable now.`;
+    messageEl.textContent = `${milestoneLabel(snapshot.mintableMilestone)} is mintable now. Accidental jump/tap will not restart it.`;
     return;
   }
 
@@ -306,7 +299,11 @@ function updateStats(snapshot) {
   }
 }
 
-$('#startBtn').addEventListener('click', () => game.start());
+$('#startBtn').addEventListener('click', () => {
+  game.start();
+  updateStats(game.snapshot());
+});
+
 $('#jumpBtn').addEventListener('click', () => game.jump());
 
 soundBtn.addEventListener('click', () => {
@@ -319,11 +316,11 @@ connectBtn.addEventListener('click', async () => {
 
   connectInProgress = true;
   updateWalletButtons();
-  walletStatus.textContent = 'Opening wallet list. Choose MetaMask, Trust Wallet, Coinbase Wallet, or another EVM wallet for Base.';
+  walletStatus.textContent = 'Opening EVM wallet list...';
 
   try {
     await openWalletModal();
-    walletStatus.textContent = 'Wallet list opened. Choose an EVM/Base wallet from the modal.';
+    walletStatus.textContent = 'Wallet list opened. Choose MetaMask, Trust Wallet, Coinbase, Rabby, or WalletConnect.';
   } catch (err) {
     console.error(err);
     const message = err.shortMessage || err.message || 'Could not open wallet list.';
@@ -340,14 +337,14 @@ disconnectBtn.addEventListener('click', async () => {
 
   disconnectInProgress = true;
   updateWalletButtons();
-  walletStatus.textContent = 'Disconnecting wallet and revoking dapp permission when supported by the wallet...';
+  walletStatus.textContent = 'Disconnecting wallet and revoking permission when supported...';
 
   try {
     const result = await disconnectWallet();
     await refreshWalletUi();
     messageEl.textContent = result?.revoked
-      ? 'Wallet disconnected and dapp account permission was revoked by the wallet.'
-      : 'Wallet disconnected from the site. If your wallet still lists this dapp, remove it from the wallet connections screen.';
+      ? 'Wallet disconnected and account permission was revoked by the wallet.'
+      : 'Wallet disconnected from the site. Some wallets require removing the dapp from their own connections screen.';
   } catch (err) {
     console.error(err);
     const message = err.shortMessage || err.message || 'Disconnect failed.';
@@ -360,6 +357,8 @@ disconnectBtn.addEventListener('click', async () => {
 });
 
 mintBtn.addEventListener('click', async () => {
+  if (mintInProgress) return;
+
   try {
     const mintable = lastSnapshot?.mintableMilestone;
 
@@ -369,8 +368,10 @@ mintBtn.addEventListener('click', async () => {
 
     const payload = game.getMintPayload(mintable.milestone);
 
-    mintBtn.disabled = true;
-    messageEl.textContent = `Minting #${payload.milestone}. Confirm only if it calls mintMilestone and asks for gas only.`;
+    mintInProgress = true;
+    updateMintButton(lastSnapshot);
+    updateWalletButtons();
+    messageEl.textContent = `Preparing mint #${payload.milestone}. Your wallet should ask for gas only. Do not close this page.`;
 
     const result = await mintMilestone(
       payload.milestone,
@@ -378,11 +379,14 @@ mintBtn.addEventListener('click', async () => {
       payload.playSeconds
     );
 
+    mintedMilestones.add(payload.milestone);
     messageEl.innerHTML = `NFT minted. <a href="${CONFIG.explorerUrl}/tx/${result.hash}" target="_blank" rel="noreferrer">View transaction</a>`;
   } catch (err) {
     console.error(err);
     messageEl.textContent = err.shortMessage || err.message || 'Mint failed.';
   } finally {
+    mintInProgress = false;
+    updateWalletButtons();
     updateStats(lastSnapshot || game.snapshot());
   }
 });
@@ -391,7 +395,8 @@ window.addEventListener('bqm-wallet-changed', refreshWalletUi);
 
 updateSoundButton();
 updateWalletButtons();
+updateStats(game.snapshot());
 
 if (!CONFIG.contractAddress) {
-  messageEl.textContent = 'Contract not configured yet. Add VITE_CONTRACT_ADDRESS in GitHub Actions variables.';
+  messageEl.textContent = 'Contract is not configured. Add VITE_CONTRACT_ADDRESS in GitHub Actions variables.';
 }
