@@ -195,6 +195,16 @@ let connectInProgress = false;
 let disconnectInProgress = false;
 let mintInProgress = false;
 let mintedMilestones = new Set();
+let protectedMessageUntil = 0;
+
+function setProtectedMessage(message, ms = 15000) {
+  protectedMessageUntil = Date.now() + ms;
+  messageEl.textContent = message;
+}
+
+function clearProtectedMessage() {
+  protectedMessageUntil = 0;
+}
 
 function milestoneLabel(milestone) {
   if (!milestone) return 'None';
@@ -333,6 +343,7 @@ function updateStats(snapshot) {
 
   updateMintButton(snapshot);
 
+  if (Date.now() < protectedMessageUntil) return;
   if (mintInProgress) return;
 
   if (snapshot.antiCheat && !snapshot.antiCheat.clean) {
@@ -356,6 +367,7 @@ function updateStats(snapshot) {
 }
 
 $('#startBtn').addEventListener('click', () => {
+  clearProtectedMessage();
   game.start();
   updateStats(game.snapshot());
 });
@@ -427,7 +439,7 @@ mintBtn.addEventListener('click', async () => {
     mintInProgress = true;
     updateMintButton(lastSnapshot);
     updateWalletButtons();
-    messageEl.textContent = `Preparing mint #${payload.milestone}. Your wallet should ask for gas only. Do not close this page.`;
+    setProtectedMessage(`Preparing mint #${payload.milestone}. Your wallet should ask for gas only. Do not close this page.`, 120000);
 
     const result = await mintMilestone(
       payload.milestone,
@@ -436,10 +448,11 @@ mintBtn.addEventListener('click', async () => {
     );
 
     mintedMilestones.add(payload.milestone);
+    protectedMessageUntil = Date.now() + 60000;
     messageEl.innerHTML = `NFT minted. <a href="${CONFIG.explorerUrl}/tx/${result.hash}" target="_blank" rel="noreferrer">View transaction</a>`;
   } catch (err) {
     console.error(err);
-    messageEl.textContent = err.shortMessage || err.message || 'Mint failed.';
+    setProtectedMessage(err.shortMessage || err.message || 'Mint failed.', 30000);
   } finally {
     mintInProgress = false;
     updateWalletButtons();
