@@ -4,6 +4,7 @@ import { CONFIG } from './config.js';
 import { createGame, STAGE_CONFIG } from './game.js';
 import {
   connectWallet,
+  disconnectWallet,
   getBalanceText,
   mintMilestone,
   shortAddress,
@@ -13,70 +14,89 @@ import {
 const app = document.querySelector('#app');
 
 const milestoneCards = STAGE_CONFIG.map((m) => `
-  <div>
-    <b>${m.milestone}</b>
-    <span>${m.name}</span>
-    <em>${m.score.toLocaleString()} score • ${m.minPlaySeconds}s</em>
-  </div>
+  <article class="milestone-card">
+    <div class="milestone-number">${m.milestone}</div>
+    <h3>${m.name}</h3>
+    <p>${m.score.toLocaleString()} score • ${m.minPlaySeconds}s</p>
+  </article>
 `).join('');
 
 app.innerHTML = `
   <main class="shell">
     <section class="hero">
-      <div>
-        <p class="eyebrow">Base • NFT Milestone Runner</p>
-        <h1>Base Quest Milestones</h1>
-        <p class="lead">
-          Run, jump, collect green shields, lose score on protected hits, and mint ERC-721 milestone NFTs.
-          This version adds client-side anti-cheat checks without changing the smart contract.
-        </p>
+      <p class="eyebrow">Base • NFT Milestone Runner</p>
+      <h1>Base Quest Milestones</h1>
+      <p>
+        Run, jump, collect green shields, lose score on protected hits, and mint ERC-721 milestone NFTs.
+        This version adds mobile wallet support through injected wallets and WalletConnect.
+      </p>
+      <div class="actions wallet-actions">
+        <button id="connectBtn" type="button">Connect Wallet</button>
+        <button id="mobileConnectBtn" type="button">Mobile / Trust Wallet</button>
+        <button id="disconnectBtn" type="button" disabled>Disconnect</button>
       </div>
-
-      <div class="wallet">
-        <button id="connectBtn">Connect Wallet</button>
-        <p id="walletStatus" class="muted">Live on Base Mainnet. Play, score, finish the run, then mint.</p>
-      </div>
+      <p id="walletStatus" class="status-text">
+        Live on Base Mainnet. Desktop extensions, MetaMask mobile, Trust Wallet, and WalletConnect are supported.
+      </p>
     </section>
 
-    <section class="game-grid">
-      <div class="card game-card">
-        <canvas id="gameCanvas"></canvas>
-
-        <div class="controls">
-          <button id="startBtn">Start / Restart</button>
-          <button id="jumpBtn">Jump</button>
-          <button id="soundBtn">Sound: On</button>
-          <button id="mintBtn" disabled>Mint NFT Locked</button>
-        </div>
-
-        <p id="message" class="muted">
-          Anti-cheat rule: mint is allowed only after a finished clean run.
-        </p>
+    <section class="game-panel">
+      <canvas id="gameCanvas" width="960" height="420" aria-label="Base Quest runner game"></canvas>
+      <div class="game-controls">
+        <button id="startBtn" type="button">Start / Restart</button>
+        <button id="jumpBtn" type="button">Jump</button>
+        <button id="soundBtn" type="button">Sound: On</button>
+        <button id="mintBtn" type="button" disabled>Mint NFT Locked</button>
       </div>
-
-      <aside class="card stats">
-        <h2>Run Stats</h2>
-
-        <dl>
-          <div><dt>Score</dt><dd id="score">0</dd></div>
-          <div><dt>Best</dt><dd id="best">0</dd></div>
-          <div><dt>Stage</dt><dd id="stage">Rookie Runner</dd></div>
-          <div><dt>Score Unlocked</dt><dd id="unlocked">None</dd></div>
-          <div><dt>Mintable NFT</dt><dd id="mintable">None</dd></div>
-          <div><dt>Play Time</dt><dd id="seconds">0s</dd></div>
-          <div><dt>Protected Hit Penalty</dt><dd id="penalty">-100</dd></div>
-          <div><dt>Last Hit</dt><dd id="lastPenalty">None</dd></div>
-          <div><dt>Anti-Cheat</dt><dd id="antiCheat">Not started</dd></div>
-          <div><dt>Next Requirement</dt><dd id="requirement">1,200 score • 20s</dd></div>
-        </dl>
-
-        <p class="muted">
-          Press Space, tap the game, or use Jump.
-        </p>
-      </aside>
+      <p id="message" class="message">
+        Anti-cheat rule: mint is allowed only after a finished clean run.
+      </p>
     </section>
 
-    <section class="card info">
+    <section class="stats-grid" aria-label="Run statistics">
+      <article>
+        <span>Score</span>
+        <strong id="score">0</strong>
+      </article>
+      <article>
+        <span>Best</span>
+        <strong id="best">0</strong>
+      </article>
+      <article>
+        <span>Stage</span>
+        <strong id="stage">Rookie Runner</strong>
+      </article>
+      <article>
+        <span>Score Unlocked</span>
+        <strong id="unlocked">None</strong>
+      </article>
+      <article>
+        <span>Mintable NFT</span>
+        <strong id="mintable">None</strong>
+      </article>
+      <article>
+        <span>Play Time</span>
+        <strong id="seconds">0s</strong>
+      </article>
+      <article>
+        <span>Protected Hit Penalty</span>
+        <strong id="penalty">-100</strong>
+      </article>
+      <article>
+        <span>Last Hit</span>
+        <strong id="lastPenalty">None</strong>
+      </article>
+      <article>
+        <span>Anti-Cheat</span>
+        <strong id="antiCheat">Not started</strong>
+      </article>
+      <article class="wide">
+        <span>Next Requirement</span>
+        <strong id="requirement">1,200 score • 20s</strong>
+      </article>
+    </section>
+
+    <section class="safety-card">
       <h2>Wallet Safety</h2>
       <p>
         This app only calls <code>mintMilestone</code>. Reject any wallet popup asking for token approval,
@@ -84,7 +104,7 @@ app.innerHTML = `
       </p>
     </section>
 
-    <section class="card info">
+    <section>
       <h2>Milestones</h2>
       <div class="milestones">
         ${milestoneCards}
@@ -107,11 +127,14 @@ const requirementEl = $('#requirement');
 const messageEl = $('#message');
 const mintBtn = $('#mintBtn');
 const connectBtn = $('#connectBtn');
+const mobileConnectBtn = $('#mobileConnectBtn');
+const disconnectBtn = $('#disconnectBtn');
 const walletStatus = $('#walletStatus');
 const soundBtn = $('#soundBtn');
 const antiCheatEl = $('#antiCheat');
 
 let lastSnapshot = null;
+let connectInProgress = false;
 
 function milestoneLabel(milestone) {
   if (!milestone) return 'None';
@@ -144,9 +167,31 @@ function updateSoundButton() {
   soundBtn.textContent = game.isSoundEnabled() ? 'Sound: On' : 'Sound: Off';
 }
 
+function updateWalletButtons() {
+  const connected = Boolean(walletState.account);
+
+  connectBtn.disabled = connectInProgress;
+  mobileConnectBtn.disabled = connectInProgress;
+  disconnectBtn.disabled = !connected || connectInProgress;
+
+  if (connected) {
+    connectBtn.textContent = shortAddress(walletState.account);
+    mobileConnectBtn.textContent = walletState.walletName || walletState.connectionType || 'Connected';
+    return;
+  }
+
+  connectBtn.textContent = connectInProgress ? 'Connecting...' : 'Connect Wallet';
+  mobileConnectBtn.textContent = connectInProgress ? 'Connecting...' : 'Mobile / Trust Wallet';
+}
+
 function updateMintButton(snapshot) {
   const mintable = snapshot?.mintableMilestone;
-  const canMint = Boolean(CONFIG.contractAddress && walletState.account && mintable && snapshot.mintAllowed);
+  const canMint = Boolean(
+    CONFIG.contractAddress &&
+    walletState.account &&
+    mintable &&
+    snapshot.mintAllowed
+  );
 
   mintBtn.disabled = !canMint;
 
@@ -166,6 +211,51 @@ function updateMintButton(snapshot) {
   }
 
   mintBtn.textContent = `Mint #${mintable.milestone} ${mintable.name}`;
+}
+
+async function refreshWalletUi() {
+  updateWalletButtons();
+
+  if (!walletState.account) {
+    walletStatus.textContent = 'Live on Base Mainnet. Connect with extension, mobile wallet browser, or WalletConnect.';
+    updateStats(lastSnapshot || game.snapshot());
+    return;
+  }
+
+  try {
+    const balance = await getBalanceText();
+    const name = walletState.walletName || walletState.connectionType || 'Wallet';
+    walletStatus.textContent = `${name} connected on ${CONFIG.chainName} • ${balance}`;
+  } catch {
+    walletStatus.textContent = `${CONFIG.chainName} connected • ${shortAddress(walletState.account)}`;
+  }
+
+  updateStats(lastSnapshot || game.snapshot());
+}
+
+async function connectWithMode(mode) {
+  if (connectInProgress) return;
+
+  connectInProgress = true;
+  updateWalletButtons();
+  walletStatus.textContent = mode === 'walletconnect'
+    ? 'Opening WalletConnect. On mobile, choose Trust Wallet or MetaMask from the popup.'
+    : 'Connecting wallet...';
+
+  try {
+    await connectWallet({ mode });
+    await refreshWalletUi();
+
+    messageEl.textContent = CONFIG.contractAddress
+      ? 'Wallet connected. Finish a clean run to mint.'
+      : 'Wallet connected, but VITE_CONTRACT_ADDRESS is empty. Add the Base Mainnet contract address.';
+  } catch (err) {
+    console.error(err);
+    walletStatus.textContent = err.shortMessage || err.message || 'Connection failed.';
+  } finally {
+    connectInProgress = false;
+    updateWalletButtons();
+  }
 }
 
 const game = createGame($('#gameCanvas'), {
@@ -246,23 +336,13 @@ soundBtn.addEventListener('click', () => {
   updateSoundButton();
 });
 
-connectBtn.addEventListener('click', async () => {
-  try {
-    await connectWallet();
+connectBtn.addEventListener('click', () => connectWithMode('auto'));
+mobileConnectBtn.addEventListener('click', () => connectWithMode('walletconnect'));
 
-    const balance = await getBalanceText();
-
-    connectBtn.textContent = shortAddress(walletState.account);
-    walletStatus.textContent = `${CONFIG.chainName} connected • ${balance}`;
-    messageEl.textContent = CONFIG.contractAddress
-      ? 'Wallet connected. Finish a clean run to mint.'
-      : 'Wallet connected, but VITE_CONTRACT_ADDRESS is empty. Add the contract address.';
-
-    updateStats(lastSnapshot || game.snapshot());
-  } catch (err) {
-    console.error(err);
-    walletStatus.textContent = err.shortMessage || err.message || 'Connection failed.';
-  }
+disconnectBtn.addEventListener('click', async () => {
+  await disconnectWallet();
+  await refreshWalletUi();
+  messageEl.textContent = 'Wallet disconnected.';
 });
 
 mintBtn.addEventListener('click', async () => {
@@ -284,7 +364,7 @@ mintBtn.addEventListener('click', async () => {
       payload.playSeconds
     );
 
-    messageEl.innerHTML = `NFT minted. <a href="${CONFIG.explorerUrl}/tx/${result.hash}" target="_blank" rel="noopener">View transaction</a>`;
+    messageEl.innerHTML = `NFT minted. <a href="${CONFIG.explorerUrl}/tx/${result.hash}" target="_blank" rel="noreferrer">View transaction</a>`;
   } catch (err) {
     console.error(err);
     messageEl.textContent = err.shortMessage || err.message || 'Mint failed.';
@@ -293,8 +373,11 @@ mintBtn.addEventListener('click', async () => {
   }
 });
 
+window.addEventListener('bqm-wallet-changed', refreshWalletUi);
+
 updateSoundButton();
+updateWalletButtons();
 
 if (!CONFIG.contractAddress) {
-  messageEl.textContent = 'Contract not configured yet. Add VITE_CONTRACT_ADDRESS in GitHub/Vercel variables.';
+  messageEl.textContent = 'Contract not configured yet. Add VITE_CONTRACT_ADDRESS in GitHub Actions variables.';
 }
