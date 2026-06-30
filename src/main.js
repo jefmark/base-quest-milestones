@@ -6,6 +6,7 @@ import {
   connectWallet,
   disconnectWallet,
   getBalanceText,
+  getWalletChoices,
   mintMilestone,
   shortAddress,
   walletState,
@@ -28,15 +29,14 @@ app.innerHTML = `
       <h1>Base Quest Milestones</h1>
       <p>
         Run, jump, collect green shields, lose score on protected hits, and mint ERC-721 milestone NFTs.
-        This version adds mobile wallet support through injected wallets and WalletConnect.
+        This version uses one wallet button for desktop extensions, mobile wallet browsers, and WalletConnect.
       </p>
       <div class="actions wallet-actions">
         <button id="connectBtn" type="button">Connect Wallet</button>
-        <button id="mobileConnectBtn" type="button">Mobile / Trust Wallet</button>
-        <button id="disconnectBtn" type="button" disabled>Disconnect</button>
+        <button id="disconnectBtn" type="button" hidden>Disconnect</button>
       </div>
       <p id="walletStatus" class="status-text">
-        Live on Base Mainnet. Desktop extensions, MetaMask mobile, Trust Wallet, and WalletConnect are supported.
+        Live on Base Mainnet. Choose MetaMask, Trust Wallet, browser wallet, or WalletConnect.
       </p>
     </section>
 
@@ -111,9 +111,139 @@ app.innerHTML = `
       </div>
     </section>
   </main>
+
+  <div id="walletModal" class="wallet-modal" hidden>
+    <div class="wallet-modal__backdrop" data-close-wallet-modal></div>
+    <section class="wallet-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="walletModalTitle">
+      <div class="wallet-modal__header">
+        <div>
+          <p class="wallet-modal__eyebrow">Connect to Base Mainnet</p>
+          <h2 id="walletModalTitle">Choose wallet</h2>
+        </div>
+        <button id="closeWalletModalBtn" type="button" class="wallet-modal__close" aria-label="Close wallet list">×</button>
+      </div>
+      <p class="wallet-modal__hint">
+        Choose the wallet yourself. This prevents the browser from opening the wrong wallet, such as Keplr.
+      </p>
+      <div id="walletChoices" class="wallet-choice-list">
+        <button type="button" class="wallet-choice" disabled>Loading wallets...</button>
+      </div>
+      <p class="wallet-modal__small">
+        On mobile Chrome/Samsung Browser, choose WalletConnect / Mobile Wallets, then select Trust Wallet or MetaMask.
+        Inside MetaMask's own browser, MetaMask usually appears directly.
+      </p>
+    </section>
+  </div>
 `;
 
-const $ = (id) => document.querySelector(id);
+const modalStyle = document.createElement('style');
+modalStyle.textContent = `
+  .wallet-modal[hidden] { display: none !important; }
+  .wallet-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+  }
+  .wallet-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(8px);
+  }
+  .wallet-modal__dialog {
+    position: relative;
+    width: min(460px, 100%);
+    max-height: min(680px, calc(100vh - 36px));
+    overflow: auto;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 22px;
+    background: #101522;
+    color: #ffffff;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+    padding: 22px;
+  }
+  .wallet-modal__header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .wallet-modal__header h2 {
+    margin: 4px 0 0;
+    font-size: 1.45rem;
+  }
+  .wallet-modal__eyebrow {
+    margin: 0;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #7dd3fc;
+  }
+  .wallet-modal__close {
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 1.45rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .wallet-modal__hint,
+  .wallet-modal__small {
+    color: #cbd5e1;
+    line-height: 1.55;
+  }
+  .wallet-modal__small {
+    font-size: 0.86rem;
+    margin-bottom: 0;
+  }
+  .wallet-choice-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .wallet-choice {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 54px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 800;
+    text-align: left;
+  }
+  .wallet-choice:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.14);
+  }
+  .wallet-choice:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+  .wallet-choice small {
+    display: block;
+    margin-top: 3px;
+    color: #cbd5e1;
+    font-weight: 500;
+  }
+  .wallet-choice__arrow {
+    opacity: 0.72;
+  }
+`;
+document.head.appendChild(modalStyle);
+
+const $ = (selector) => document.querySelector(selector);
 
 const scoreEl = $('#score');
 const bestEl = $('#best');
@@ -127,14 +257,17 @@ const requirementEl = $('#requirement');
 const messageEl = $('#message');
 const mintBtn = $('#mintBtn');
 const connectBtn = $('#connectBtn');
-const mobileConnectBtn = $('#mobileConnectBtn');
 const disconnectBtn = $('#disconnectBtn');
 const walletStatus = $('#walletStatus');
 const soundBtn = $('#soundBtn');
 const antiCheatEl = $('#antiCheat');
+const walletModal = $('#walletModal');
+const walletChoicesEl = $('#walletChoices');
+const closeWalletModalBtn = $('#closeWalletModalBtn');
 
 let lastSnapshot = null;
 let connectInProgress = false;
+let currentWalletChoices = [];
 
 function milestoneLabel(milestone) {
   if (!milestone) return 'None';
@@ -170,18 +303,18 @@ function updateSoundButton() {
 function updateWalletButtons() {
   const connected = Boolean(walletState.account);
 
+  connectBtn.hidden = connected;
+  disconnectBtn.hidden = !connected;
   connectBtn.disabled = connectInProgress;
-  mobileConnectBtn.disabled = connectInProgress;
-  disconnectBtn.disabled = !connected || connectInProgress;
-
-  if (connected) {
-    connectBtn.textContent = shortAddress(walletState.account);
-    mobileConnectBtn.textContent = walletState.walletName || walletState.connectionType || 'Connected';
-    return;
-  }
+  disconnectBtn.disabled = connectInProgress;
 
   connectBtn.textContent = connectInProgress ? 'Connecting...' : 'Connect Wallet';
-  mobileConnectBtn.textContent = connectInProgress ? 'Connecting...' : 'Mobile / Trust Wallet';
+
+  if (connected) {
+    disconnectBtn.textContent = `Disconnect ${shortAddress(walletState.account)}`;
+  } else {
+    disconnectBtn.textContent = 'Disconnect';
+  }
 }
 
 function updateMintButton(snapshot) {
@@ -217,7 +350,7 @@ async function refreshWalletUi() {
   updateWalletButtons();
 
   if (!walletState.account) {
-    walletStatus.textContent = 'Live on Base Mainnet. Connect with extension, mobile wallet browser, or WalletConnect.';
+    walletStatus.textContent = 'Live on Base Mainnet. Click Connect Wallet and choose MetaMask, Trust Wallet, browser wallet, or WalletConnect.';
     updateStats(lastSnapshot || game.snapshot());
     return;
   }
@@ -225,7 +358,7 @@ async function refreshWalletUi() {
   try {
     const balance = await getBalanceText();
     const name = walletState.walletName || walletState.connectionType || 'Wallet';
-    walletStatus.textContent = `${name} connected on ${CONFIG.chainName} • ${balance}`;
+    walletStatus.textContent = `${name} connected on ${CONFIG.chainName} • ${shortAddress(walletState.account)} • ${balance}`;
   } catch {
     walletStatus.textContent = `${CONFIG.chainName} connected • ${shortAddress(walletState.account)}`;
   }
@@ -233,17 +366,70 @@ async function refreshWalletUi() {
   updateStats(lastSnapshot || game.snapshot());
 }
 
-async function connectWithMode(mode) {
-  if (connectInProgress) return;
+function closeWalletModal() {
+  walletModal.hidden = true;
+}
+
+async function renderWalletChoices() {
+  walletChoicesEl.innerHTML = '<button type="button" class="wallet-choice" disabled>Checking wallets...</button>';
+
+  try {
+    currentWalletChoices = await getWalletChoices();
+  } catch (err) {
+    console.error(err);
+    currentWalletChoices = [
+      {
+        id: 'walletconnect',
+        type: 'walletconnect',
+        walletId: 'walletconnect',
+        label: 'WalletConnect / Mobile Wallets',
+        providerDetail: null,
+      },
+    ];
+  }
+
+  walletChoicesEl.innerHTML = currentWalletChoices.map((choice, index) => {
+    const description = choice.type === 'walletconnect'
+      ? 'Best for mobile Chrome, Trust Wallet, MetaMask Mobile, and other wallets'
+      : 'Detected in this browser';
+
+    return `
+      <button type="button" class="wallet-choice" data-wallet-choice-index="${index}">
+        <span>
+          ${choice.label}
+          <small>${description}</small>
+        </span>
+        <span class="wallet-choice__arrow">›</span>
+      </button>
+    `;
+  }).join('');
+}
+
+async function openWalletModal() {
+  if (connectInProgress || walletState.account) return;
+
+  walletModal.hidden = false;
+  await renderWalletChoices();
+}
+
+async function connectWithChoice(choice) {
+  if (!choice || connectInProgress) return;
 
   connectInProgress = true;
   updateWalletButtons();
-  walletStatus.textContent = mode === 'walletconnect'
-    ? 'Opening WalletConnect. On mobile, choose Trust Wallet or MetaMask from the popup.'
-    : 'Connecting wallet...';
+
+  const isWalletConnect = choice.type === 'walletconnect';
+  walletStatus.textContent = isWalletConnect
+    ? 'Opening WalletConnect. On mobile, choose Trust Wallet or MetaMask from the wallet list.'
+    : `Opening ${choice.label}...`;
 
   try {
-    await connectWallet({ mode });
+    await connectWallet({
+      walletId: choice.walletId,
+      providerDetail: choice.providerDetail,
+    });
+
+    closeWalletModal();
     await refreshWalletUi();
 
     messageEl.textContent = CONFIG.contractAddress
@@ -251,7 +437,9 @@ async function connectWithMode(mode) {
       : 'Wallet connected, but VITE_CONTRACT_ADDRESS is empty. Add the Base Mainnet contract address.';
   } catch (err) {
     console.error(err);
-    walletStatus.textContent = err.shortMessage || err.message || 'Connection failed.';
+    const message = err.shortMessage || err.message || 'Connection failed.';
+    walletStatus.textContent = message;
+    messageEl.textContent = message;
   } finally {
     connectInProgress = false;
     updateWalletButtons();
@@ -336,8 +524,24 @@ soundBtn.addEventListener('click', () => {
   updateSoundButton();
 });
 
-connectBtn.addEventListener('click', () => connectWithMode('auto'));
-mobileConnectBtn.addEventListener('click', () => connectWithMode('walletconnect'));
+connectBtn.addEventListener('click', openWalletModal);
+
+closeWalletModalBtn.addEventListener('click', closeWalletModal);
+
+walletModal.addEventListener('click', (event) => {
+  if (event.target?.matches('[data-close-wallet-modal]')) {
+    closeWalletModal();
+  }
+});
+
+walletChoicesEl.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-wallet-choice-index]');
+  if (!button) return;
+
+  const index = Number(button.dataset.walletChoiceIndex);
+  const choice = currentWalletChoices[index];
+  await connectWithChoice(choice);
+});
 
 disconnectBtn.addEventListener('click', async () => {
   await disconnectWallet();
