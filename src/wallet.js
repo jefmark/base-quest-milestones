@@ -1028,6 +1028,24 @@ export async function getBalanceText() {
   return `${Number(formatUnits(balance, 18)).toFixed(5)} ETH`;
 }
 
+export async function hasMintedMilestone(milestone) {
+  if (!walletState.account || !CONFIG.contractAddress) return false;
+
+  await ensureCorrectNetwork();
+  await refreshSignerAndContract();
+
+  if (!walletState.contract) return false;
+
+  const safeMilestone = Math.floor(Number(milestone));
+  if (!Number.isFinite(safeMilestone) || safeMilestone < 1) return false;
+
+  return readAlreadyMintedWithFallback(
+    walletState.contract,
+    walletState.account,
+    safeMilestone
+  );
+}
+
 export async function mintMilestone(milestone, score, playSeconds) {
   if (!walletState.account) {
     throw new Error('Connect your wallet first.');
