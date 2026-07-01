@@ -11,6 +11,34 @@ import walletConnectSvg from '@web3icons/core/svgs/wallets/branded/wallet-connec
 
 import { CONFIG, CONTRACT_ABI } from './config.js';
 
+const BUILDER_CODE_DATA_SUFFIX = '0x62635f676c617863366f750b0080218021802180218021802180218021';
+
+function normalizeHexData(value, label) {
+  const raw = String(value || '').trim();
+  if (!raw) return '0x';
+  if (!/^0x[0-9a-fA-F]*$/.test(raw)) {
+    throw new Error(`${label} must be a 0x-prefixed hex string.`);
+  }
+  if ((raw.length - 2) % 2 !== 0) {
+    throw new Error(`${label} must contain an even number of hex characters.`);
+  }
+  return raw;
+}
+
+function appendBuilderCodeDataSuffix(data) {
+  const baseData = normalizeHexData(data, 'Transaction data');
+  const suffix = normalizeHexData(BUILDER_CODE_DATA_SUFFIX, 'Builder Code data suffix');
+
+  if (suffix === '0x') return baseData;
+
+  const suffixBody = suffix.slice(2);
+  if (baseData.toLowerCase().endsWith(suffixBody.toLowerCase())) {
+    return baseData;
+  }
+
+  return `${baseData}${suffixBody}`;
+}
+
 export const walletState = {
   account: '',
   provider: null,
@@ -299,7 +327,9 @@ async function sendMintTransactionDirect(milestone, score, playSeconds) {
   }
 
   const iface = new Interface(CONTRACT_ABI);
-  const data = iface.encodeFunctionData('mintMilestone', [milestone, score, playSeconds]);
+  const data = appendBuilderCodeDataSuffix(
+    iface.encodeFunctionData('mintMilestone', [milestone, score, playSeconds])
+  );
 
   const txParams = {
     from: walletState.account,
