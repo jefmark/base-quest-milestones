@@ -1001,4 +1001,9 @@ Steps to reproduce
 MIT License.
 
 
-are provided for this project and demo use. Unless otherwise stated, the artwork remains owned by the project creator and should not be reused as standalone commercial artwork without permission.
+
+## Asset License Notice
+
+The source code is released under the MIT License.
+
+NFT images, artwork, logos, and visual assets in public/nft/ are provided for this project and demo use. Unless otherwise stated, the artwork remains owned by the project creator and should not be reused as standalone commercial artwork without permission.
