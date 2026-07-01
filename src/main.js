@@ -326,6 +326,11 @@ function isMobileJumpInput() {
 }
 
 function shouldIgnoreMobileJumpTarget(target) {
+  if (!target) return false;
+
+  // Only real controls must be protected from mobile tap-to-jump.
+  // Status/error text above the Mint button is intentionally NOT ignored,
+  // so tapping that message area jumps on mobile.
   return Boolean(target.closest(`
     button,
     a,
@@ -338,7 +343,9 @@ function shouldIgnoreMobileJumpTarget(target) {
     [contenteditable="true"],
     .wallet-actions,
     .game-controls,
-    .mint-bar,
+    .mint-action,
+    .primary-action,
+    .ghost-action,
     .bqm-wallet-overlay,
     .bqm-wallet-modal,
     .bqm-wallet-row,
