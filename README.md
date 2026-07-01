@@ -1,156 +1,102 @@
 # Base Quest Milestones
 
-Base Quest Milestones is a no-server browser game with ERC-721 milestone NFT badges on the Base network.
+Base Quest Milestones is a browser-based ERC-721 runner game deployed on GitHub Pages. Players run through milestone checkpoints, unlock NFT mint opportunities, connect an EVM wallet, and mint milestone NFTs on Base Mainnet.
 
-Players run inside a lightweight canvas game, collect shields, avoid obstacles, build score, and mint milestone NFTs when they reach verified score and play-time requirements. The frontend is a static Vite app. The smart contract is a simple ERC-721 milestone badge contract with no paid mint, no ERC-20 approval flow, and no token transfer request from the player wallet.
+The project is designed for desktop EVM wallets, mobile wallet browsers, WalletConnect QR/mobile connection, Base Mainnet NFT minting, and static deployment through Vite and GitHub Pages.
 
 > Current status: experimental MVP. This project is suitable for learning, demo use, portfolio use, and early community testing. Do not attach high-value rewards without stronger server-side or on-chain verification.
 
 ---
 
-## Table of Contents
+## Live Site
 
-- [Project Overview](#project-overview)
-- [Live Links](#live-links)
-- [Core Features](#core-features)
-- [How the Game Works](#how-the-game-works)
-- [Milestone Rules](#milestone-rules)
-- [No-Server Anti-Cheat Model](#no-server-anti-cheat-model)
-- [Smart Contract Overview](#smart-contract-overview)
-- [NFT Metadata and Images](#nft-metadata-and-images)
-- [Wallet Safety Model](#wallet-safety-model)
-- [Project Structure](#project-structure)
-- [Local Setup](#local-setup)
-- [Environment Variables](#environment-variables)
-- [Run Locally](#run-locally)
-- [Build the Frontend](#build-the-frontend)
-- [Deploy the Frontend with GitHub Pages](#deploy-the-frontend-with-github-pages)
-- [Deploy or Manage the Contract with Remix](#deploy-or-manage-the-contract-with-remix)
-- [Update Milestone Settings Without Redeploying](#update-milestone-settings-without-redeploying)
-- [Fix or Update NFT Metadata](#fix-or-update-nft-metadata)
-- [Troubleshooting](#troubleshooting)
-- [Security Notes](#security-notes)
-- [Roadmap](#roadmap)
-- [Official References](#official-references)
-- [License](#license)
-
----
-
-## Project Overview
-
-Base Quest Milestones combines three parts:
-
-1. **Canvas browser game**
-   - Runs fully in the browser.
-   - Uses player input, obstacles, shields, score, time, and game-over state.
-   - Does not require a backend server.
-
-2. **Static web app**
-   - Built with Vite.
-   - Uses JavaScript modules.
-   - Connects to EVM wallets through ethers v6.
-
-3. **ERC-721 milestone NFT contract**
-   - Deployed on Base-compatible EVM networks.
-   - Mints badge NFTs for score milestones.
-   - Uses milestone metadata files such as `1.json`, `2.json`, etc.
-   - Does not accept ETH payments.
-   - Does not ask the user for token approvals.
-
-The goal is to create a simple Web3 game loop:
-
-```text
-Play → Reach score and time requirement → Finish a clean run → Connect wallet → Mint milestone NFT
-```
-
----
-
-## Live Links
-
-Replace these with your real production links after deployment.
-
-```text
-Frontend:
+```txt
 https://jefmark.github.io/base-quest-milestones/
-
-Repository:
-https://github.com/jefmark/base-quest-milestones
-
-Base Mainnet Explorer:
-https://basescan.org
-
-Base Sepolia Explorer:
-https://sepolia.basescan.org
 ```
 
-If you deploy a new contract, add it here:
+## Repository
 
-```text
-Current Contract Address:
-0xYOUR_CONTRACT_ADDRESS
+```txt
+https://github.com/jefmark/base-quest-milestones
+```
+
+## Network
+
+```txt
+Chain ID: 8453
+Chain Name: Base
+RPC URL: https://mainnet.base.org
+Explorer: https://basescan.org
 ```
 
 ---
 
 ## Core Features
 
-- Browser game built with Vite and Canvas.
-- Wallet connection with ethers v6.
-- ERC-721 NFT milestone badges.
-- No paid mint.
-- No ERC-20 approval.
-- No `transferFrom` request from player wallets.
-- Owner-managed milestone settings.
-- Owner-managed base metadata URI.
-- Pausable mint function.
-- Mint cooldown per wallet.
-- One mint per wallet per milestone.
-- Static metadata and image hosting.
-- Client-side anti-cheat checks for casual cheating.
-- GitHub Pages deployment support.
-- Base Mainnet and Base Sepolia configuration support.
+### Game
+
+- Runner-style browser game
+- Six NFT milestones
+- Mobile and desktop gameplay support
+- Mobile tap-to-jump support
+- Sound toggle
+- Start / Restart control
+- Mint button only appears when an NFT milestone is unlocked
+- If a milestone NFT is already minted, the game should not unnecessarily lock the player at that milestone
+- If a milestone NFT is not yet minted, the game preserves the mint opportunity and prevents accidental restart/jump from skipping the claim
+
+### NFT Minting
+
+- ERC-721 minting on Base Mainnet
+- Milestone-specific mint flow
+- Wallet network validation
+- Mobile wallet browser support
+- Direct transaction request flow for mobile wallets
+- Persistent mint status messages
+- NFT preview after successful mint
+- No paid mint
+- No ERC-20 approval flow
+- No token transfer request from the player wallet
+
+NFT images are expected to exist in:
+
+```txt
+public/nft/1.png
+public/nft/2.png
+public/nft/3.png
+public/nft/4.png
+public/nft/5.png
+public/nft/6.png
+```
+
+Metadata files are expected to exist in:
+
+```txt
+public/metadata/
+```
 
 ---
 
 ## How the Game Works
 
-The player controls a runner.
+The player controls a runner. The game includes obstacles, jump input, score gain, milestone checkpoint detection, mint eligibility checks, game-over state, and mint-preserve behavior when an unminted milestone is unlocked.
 
-The game includes:
+Normal loop:
 
-- Obstacles.
-- Green shield orbs.
-- Score gain over time.
-- Bonus score for passing obstacles.
-- Bonus score for collecting shield orbs.
-- Score penalty when a shield protects the player from an obstacle.
-- Game over when the player hits an obstacle without shield protection.
-
-The game calculates:
-
-```text
-score
-play time
-current milestone
-next required milestone
-anti-cheat status
-mint eligibility
+```txt
+Play
+→ Reach required score/time
+→ Unlock milestone
+→ Connect wallet
+→ Mint milestone NFT
+→ Show minted NFT image
 ```
-
-A milestone is only considered mintable when both conditions are met:
-
-```text
-score >= required milestone score
-play time >= required milestone time
-```
-
-In the anti-cheat version, minting is only allowed after a finished clean run.
 
 ---
 
 ## Milestone Rules
 
-Recommended balanced milestone settings:
+Recommended milestone settings:
 
 | Milestone | Name | Required Score | Required Play Time |
 |---:|---|---:|---:|
@@ -161,7 +107,7 @@ Recommended balanced milestone settings:
 | 5 | Block Master | 30,000 | 125 seconds |
 | 6 | Onchain Legend | 45,000 | 160 seconds |
 
-These values should match both places:
+These values must match both places:
 
 1. `src/game.js`
 2. The deployed contract milestone settings
@@ -170,189 +116,35 @@ If the frontend and contract values do not match, the app may show a milestone a
 
 ---
 
-## No-Server Anti-Cheat Model
-
-This project uses client-side anti-cheat checks because it is designed to run without a backend server.
-
-The current no-server anti-cheat model can block casual cheating inside the normal website UI:
-
-- Minting is allowed only after game over.
-- The run becomes invalid if the player switches tabs during an active run.
-- The run becomes invalid if the browser freezes for too long.
-- The run becomes invalid if the score rate is too high.
-- The run becomes invalid if the internal score ledger does not match the visible score.
-- The run becomes invalid if jump input frequency is abnormal.
-- The app sends mint data through `game.getMintPayload()` instead of raw manual input.
-
-Important limitation:
-
-```text
-No-server anti-cheat is not full security.
-```
-
-The smart contract still accepts `clientScore` and `playSeconds` as transaction parameters. A technical user can bypass the frontend and call the contract directly from Remix, Basescan, or another script.
-
-For high-value rewards, use one of these stronger models:
-
-- Backend signed mint authorization.
-- EIP-712 signed score proofs.
-- On-chain game verification.
-- Commit-reveal gameplay.
-- Zero-knowledge or deterministic proof systems.
-
-For this project, the no-server model is acceptable for low-value NFT badges, portfolio demos, and casual community games.
-
----
-
-## Smart Contract Overview
-
-Main contract:
-
-```text
-contracts/BaseQuestMilestones.sol
-```
-
-The contract is an ERC-721 milestone NFT contract.
-
-Key design points:
-
-- Contract name: `Base Quest Milestones`
-- Symbol: `BQM`
-- Uses OpenZeppelin ERC-721.
-- Uses owner-only management functions.
-- Uses pausing for emergency shutdown.
-- Uses reentrancy protection on mint.
-- Rejects direct ETH transfers.
-- Does not use payable minting.
-- Does not request player token approvals.
-
-Main user function:
-
-```solidity
-mintMilestone(uint256 milestone, uint256 clientScore, uint256 playSeconds)
-```
-
-Main owner functions:
-
-```solidity
-setMilestone(
-  uint256 milestone,
-  uint32 requiredScore,
-  uint32 minPlaySeconds,
-  bool active,
-  string calldata name
-)
-
-setBaseTokenURI(string calldata newBaseTokenURI)
-
-setMintCooldown(uint256 newCooldown)
-
-pause()
-
-unpause()
-```
-
-The contract stores which milestone belongs to each token:
-
-```solidity
-tokenMilestone[tokenId] = milestone;
-```
-
-The token URI is generated from the milestone number:
-
-```solidity
-return string.concat(baseTokenURI, milestone.toString(), ".json");
-```
-
-This means multiple NFT tokens can share the same metadata file if multiple users mint the same milestone.
-
-Example:
-
-```text
-tokenId 1 → milestone 2 → metadata/2.json
-tokenId 5 → milestone 2 → metadata/2.json
-```
-
-That is normal for this contract design.
-
----
-
 ## NFT Metadata and Images
 
 Metadata files are stored here:
 
-```text
+```txt
 public/metadata/
 ```
 
 Images are stored here:
 
-```text
+```txt
 public/nft/
-```
-
-Example structure:
-
-```text
-public/
-  metadata/
-    1.json
-    2.json
-    3.json
-    4.json
-    5.json
-    6.json
-
-  nft/
-    1.png
-    2.png
-    3.png
-    4.png
-    5.png
-    6.png
 ```
 
 When deployed to GitHub Pages, the `public` folder is served from the site root.
 
-So this file:
+Correct image URL:
 
-```text
-public/nft/1.png
-```
-
-becomes:
-
-```text
+```txt
 https://jefmark.github.io/base-quest-milestones/nft/1.png
 ```
 
-Do not include `/public/` in the live URL.
+Wrong image URL:
 
-Correct:
-
-```json
-{
-  "image": "https://jefmark.github.io/base-quest-milestones/nft/1.png"
-}
+```txt
+https://jefmark.github.io/base-quest-milestones/public/nft/1.png
 ```
 
-Wrong:
-
-```json
-{
-  "image": "https://jefmark.github.io/base-quest-milestones/public/nft/1.png"
-}
-```
-
-Wrong placeholder:
-
-```json
-{
-  "image": "https://YOUR_DOMAIN/nft/1.png"
-}
-```
-
-Each metadata file should use the OpenSea-compatible ERC-721 metadata shape:
+Each metadata file should use the ERC-721 metadata shape:
 
 ```json
 {
@@ -371,411 +163,558 @@ Each metadata file should use the OpenSea-compatible ERC-721 metadata shape:
 
 ---
 
-## Wallet Safety Model
+## Wallet Support
 
-This project is designed to minimize wallet risk.
+The wallet connection system uses a custom EVM wallet picker.
 
-The user should only see a wallet confirmation for:
+Supported wallet options:
 
-```text
-mintMilestone(...)
+```txt
+MetaMask
+Trust Wallet
+Coinbase Wallet
+Rabby Wallet
+Rainbow
+OKX Wallet
+Zerion Wallet
+Browser Wallet
+WalletConnect
 ```
 
-The user should reject any wallet popup that asks for:
+The wallet picker is EVM-focused. Non-EVM wallet flows such as Solana, Keplr, Cosmos, etc. are not used for this game.
 
-- ERC-20 approval.
-- NFT approval.
-- Unlimited spending.
-- Token transfer.
-- `transferFrom`.
-- `setApprovalForAll`.
-- Any unknown contract interaction unrelated to minting.
+### Desktop wallet behavior
 
-The contract has:
+Desktop wallets are selected through injected EVM providers when available. The app avoids blindly choosing the wrong injected provider when multiple extensions exist.
 
-```solidity
-receive() external payable {
-  revert("NO_ETH_ACCEPTED");
-}
+### Mobile wallet behavior
 
-fallback() external payable {
-  revert("NO_ETH_ACCEPTED");
-}
+Mobile wallets usually work in one of these ways:
+
+1. The site is opened directly inside the wallet browser.
+2. The user starts from Android Chrome and is deeplinked into the wallet browser.
+3. The user connects with WalletConnect.
+4. The user scans WalletConnect QR from another device.
+
+---
+
+## Important Mobile Wallet Behavior
+
+There is one known mobile wallet behavior that still exists.
+
+When the user opens the site from Android Chrome and chooses a wallet such as MetaMask or Trust Wallet, the wallet app may open the site inside its own internal browser.
+
+Because Android Chrome and the wallet internal browser are two separate browser contexts, the original page state and injected provider are not automatically transferred.
+
+The user may need to do this:
+
+```txt
+1. Open site in Android Chrome.
+2. Tap Connect Wallet.
+3. Choose MetaMask or Trust Wallet.
+4. Wallet app opens the site inside its internal browser.
+5. Tap Connect Wallet again inside the wallet browser.
+6. Choose the same wallet again.
+7. The wallet connects successfully because the provider is now injected inside the wallet browser.
 ```
 
-So direct ETH transfers are rejected.
+This is not ideal UX, but it is a known limitation of mobile wallet deeplink flows.
+
+### Why this happens
+
+Mobile wallets usually inject `window.ethereum` only inside their own browser. When the site is opened in normal Chrome, Trust Wallet or MetaMask Mobile cannot always inject the provider directly into that Chrome tab.
+
+So the first tap only moves the user into the wallet browser. The second tap connects inside the correct browser context.
+
+### What was tried
+
+Several approaches were implemented or tested during development:
+
+- Direct `window.ethereum` connection
+- Custom EVM wallet picker
+- EIP-6963 provider detection for desktop wallets
+- MetaMask / Trust Wallet mobile deeplinks
+- WalletConnect fallback
+- WalletConnect QR/modal support
+- Closing the custom wallet modal before opening WalletConnect
+- Keeping game state safer after mobile wallet redirects
+- Preventing accidental restart when a mintable NFT is available
+- Direct transaction request flow for mobile minting
+- Persistent mint status messages so mobile wallet errors remain visible
+- NFT preview after successful mint
+
+### Current status
+
+The remaining issue is:
+
+```txt
+Mobile deeplink wallets may still require two taps:
+one tap to open the wallet browser,
+another tap inside the wallet browser to connect.
+```
+
+Recommended workaround:
+
+```txt
+Use WalletConnect when the user wants to stay in the same browser context,
+or open the site directly inside MetaMask Mobile / Trust Wallet Browser.
+```
+
+---
+
+## WalletConnect Setup
+
+WalletConnect requires a valid Reown / WalletConnect Project ID.
+
+The project uses this environment variable:
+
+```txt
+VITE_WALLETCONNECT_PROJECT_ID
+```
+
+This value must be added in GitHub Repository Variables.
+
+Go to:
+
+```txt
+Repository Settings
+→ Secrets and variables
+→ Actions
+→ Variables
+→ New repository variable
+```
+
+Add:
+
+```txt
+Name:
+VITE_WALLETCONNECT_PROJECT_ID
+```
+
+```txt
+Value:
+YOUR_REAL_REOWN_PROJECT_ID
+```
+
+Do not write `Value:` inside the value field. Do not wrap the ID in quotes. Do not leave it empty. Do not use stars.
+
+Correct example format:
+
+```txt
+a1b2c3d4e5f6g7h8i9j0
+```
+
+Important: the value should be placed in Repository Variables, not only in Secrets.
+
+The GitHub Actions workflow reads:
+
+```yaml
+VITE_WALLETCONNECT_PROJECT_ID: ${{ vars.VITE_WALLETCONNECT_PROJECT_ID }}
+```
+
+So the value must exist under `vars`.
+
+---
+
+## Required GitHub Repository Variables
+
+```txt
+VITE_CHAIN_ID=8453
+VITE_CHAIN_NAME=Base
+VITE_RPC_URL=https://mainnet.base.org
+VITE_EXPLORER_URL=https://basescan.org
+VITE_CONTRACT_ADDRESS=YOUR_DEPLOYED_CONTRACT_ADDRESS
+VITE_WALLETCONNECT_PROJECT_ID=YOUR_REOWN_PROJECT_ID
+```
+
+`VITE_CONTRACT_ADDRESS` must be the actual deployed ERC-721 contract address on Base Mainnet.
+
+---
+
+## GitHub Actions Deployment
+
+The deployment workflow must pass all Vite variables into the build.
+
+File:
+
+```txt
+.github/workflows/deploy-pages.yml
+```
+
+The workflow must include:
+
+```yaml
+env:
+  VITE_CHAIN_ID: ${{ vars.VITE_CHAIN_ID }}
+  VITE_CHAIN_NAME: ${{ vars.VITE_CHAIN_NAME }}
+  VITE_RPC_URL: ${{ vars.VITE_RPC_URL }}
+  VITE_EXPLORER_URL: ${{ vars.VITE_EXPLORER_URL }}
+  VITE_CONTRACT_ADDRESS: ${{ vars.VITE_CONTRACT_ADDRESS }}
+  VITE_WALLETCONNECT_PROJECT_ID: ${{ vars.VITE_WALLETCONNECT_PROJECT_ID }}
+```
+
+Without this line:
+
+```yaml
+VITE_WALLETCONNECT_PROJECT_ID: ${{ vars.VITE_WALLETCONNECT_PROJECT_ID }}
+```
+
+the site will build without the WalletConnect Project ID, even if the variable exists in GitHub.
+
+Resulting error:
+
+```txt
+WalletConnect Project ID is missing.
+```
+
+---
+
+## Correct Deploy Workflow
+
+Use this workflow if deployment fails because of missing cache lock file or missing environment variables.
+
+```yaml
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  VITE_CHAIN_ID: ${{ vars.VITE_CHAIN_ID }}
+  VITE_CHAIN_NAME: ${{ vars.VITE_CHAIN_NAME }}
+  VITE_RPC_URL: ${{ vars.VITE_RPC_URL }}
+  VITE_EXPLORER_URL: ${{ vars.VITE_EXPLORER_URL }}
+  VITE_CONTRACT_ADDRESS: ${{ vars.VITE_CONTRACT_ADDRESS }}
+  VITE_WALLETCONNECT_PROJECT_ID: ${{ vars.VITE_WALLETCONNECT_PROJECT_ID }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build site
+        run: npm run build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+```
+
+### Why npm cache was removed
+
+An earlier workflow used:
+
+```yaml
+cache: npm
+```
+
+GitHub then expected a dependency lock file such as:
+
+```txt
+package-lock.json
+```
+
+Because the repository did not have a lock file, GitHub Actions failed with:
+
+```txt
+Dependencies lock file is not found
+```
+
+The current workflow removes npm cache to avoid that failure.
+
+---
+
+## Local Development
+
+```bash
+npm install
+npm run dev
+npm run build
+npm run preview
+```
 
 ---
 
 ## Project Structure
 
-```text
-base-quest-milestones/
-  contracts/
-    BaseQuestMilestones.sol
-
-  public/
-    metadata/
-      1.json
-      2.json
-      3.json
-      4.json
-      5.json
-      6.json
-
-    nft/
-      1.png
-      2.png
-      3.png
-      4.png
-      5.png
-      6.png
-
-  scripts/
-    deploy.js
-
-  src/
-    config.js
-    game.js
-    main.js
-    style.css
-    wallet.js
-
-  .github/
-    workflows/
-      deploy-pages.yml
-
-  hardhat.config.cjs
-  index.html
-  package.json
-  vite.config.js
+```txt
+.
+├── .github/
+│   └── workflows/
+│       └── deploy-pages.yml
+├── contracts/
+│   └── BaseQuestMilestones.sol
+├── public/
+│   ├── favicon.svg
+│   ├── site.webmanifest
+│   ├── nft/
+│   │   ├── 1.png
+│   │   ├── 2.png
+│   │   ├── 3.png
+│   │   ├── 4.png
+│   │   ├── 5.png
+│   │   └── 6.png
+│   └── metadata/
+├── scripts/
+├── src/
+│   ├── config.js
+│   ├── game.js
+│   ├── main.js
+│   ├── style.css
+│   └── wallet.js
+├── hardhat.config.cjs
+├── index.html
+├── package.json
+├── vite.config.js
+└── README.md
 ```
 
 ---
 
-## Local Setup
+## Main Files
 
-Install Node.js first.
+### `src/config.js`
 
-Recommended:
+Responsible for chain configuration, RPC URL, explorer URL, contract address, WalletConnect Project ID, and contract ABI.
 
-```text
-Node.js 20+
-npm 10+
+Important line:
+
+```js
+walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || ''
 ```
 
-Clone the repository:
+### `src/wallet.js`
 
-```bash
-git clone https://github.com/jefmark/base-quest-milestones.git
-cd base-quest-milestones
-```
+Responsible for wallet detection, EVM wallet picker, wallet icons, desktop wallet provider selection, mobile deeplink handling, WalletConnect initialization, network switching, balance reading, mint transaction creation, minted milestone checking, and disconnect handling.
 
-Install dependencies:
+### `src/game.js`
 
-```bash
-npm install
-```
+Responsible for game loop, character jump, obstacle collision, milestone unlocks, mint-preserve behavior, and restart behavior.
+
+### `src/main.js`
+
+Responsible for UI binding, button handlers, wallet modal UI, mint button state, status messages, mobile tap-to-jump behavior, and mint success NFT preview.
+
+### `src/style.css`
+
+Responsible for main layout, wallet modal design, mobile responsive layout, game panel styling, mint panel styling, and NFT preview modal styling.
 
 ---
 
-## Environment Variables
+## Security Notes
 
-The frontend reads environment variables that start with `VITE_`.
+This project uses a low-risk mint model:
 
-Create a local `.env` file:
+- No paid mint
+- No ERC-20 approval
+- No NFT approval
+- No token transfer request from players
+- No direct ETH acceptance
 
-```bash
-cp .env.example .env
+The user should only see a wallet confirmation for:
+
+```txt
+mintMilestone(...)
 ```
 
-Example for Base Sepolia:
+The user should reject any wallet popup that asks for:
 
-```env
-VITE_CHAIN_ID=84532
-VITE_CHAIN_NAME=Base Sepolia
-VITE_RPC_URL=https://sepolia.base.org
-VITE_EXPLORER_URL=https://sepolia.basescan.org
-VITE_CONTRACT_ADDRESS=0xYourSepoliaContractAddress
+- ERC-20 approval
+- NFT approval
+- Unlimited spending
+- Token transfer
+- `transferFrom`
+- `setApprovalForAll`
+- Any unknown contract interaction unrelated to minting
+
+Never commit:
+
+```txt
+Private key
+Seed phrase
+Wallet recovery phrase
+RPC admin key
+Secret deployment key
 ```
 
-Example for Base Mainnet:
+Safe to expose publicly:
 
-```env
-VITE_CHAIN_ID=8453
-VITE_CHAIN_NAME=Base
-VITE_RPC_URL=https://mainnet.base.org
-VITE_EXPLORER_URL=https://basescan.org
-VITE_CONTRACT_ADDRESS=0xYourMainnetContractAddress
-```
-
-For contract deployment scripts, use a fresh deployer wallet and store the private key only in `.env` or GitHub Secrets. Never commit a private key.
-
-Example:
-
-```env
-DEPLOYER_PRIVATE_KEY=your_private_key_here
-NFT_METADATA_BASE_URI=https://jefmark.github.io/base-quest-milestones/metadata/
-```
-
----
-
-## Run Locally
-
-Start the development server:
-
-```bash
-npm run dev
-```
-
-Open the local URL shown by Vite.
-
-Common local URL:
-
-```text
-http://localhost:5173/
-```
-
----
-
-## Build the Frontend
-
-Build the production version:
-
-```bash
-npm run build
-```
-
-Preview the production build locally:
-
-```bash
-npm run preview
-```
-
-The production build output is usually:
-
-```text
-dist/
-```
-
----
-
-## Deploy the Frontend with GitHub Pages
-
-This project can be published with GitHub Pages.
-
-Recommended repository settings:
-
-```text
-Settings → Pages → Build and deployment → Source: GitHub Actions
-```
-
-Add repository variables:
-
-```text
-Settings → Secrets and variables → Actions → Variables
-```
-
-Add these variables:
-
-```text
+```txt
 VITE_CHAIN_ID
 VITE_CHAIN_NAME
 VITE_RPC_URL
 VITE_EXPLORER_URL
 VITE_CONTRACT_ADDRESS
+VITE_WALLETCONNECT_PROJECT_ID
 ```
 
-For Base Mainnet:
-
-```text
-VITE_CHAIN_ID=8453
-VITE_CHAIN_NAME=Base
-VITE_RPC_URL=https://mainnet.base.org
-VITE_EXPLORER_URL=https://basescan.org
-VITE_CONTRACT_ADDRESS=0xYourMainnetContractAddress
-```
-
-Then run deployment:
-
-```text
-Actions → Deploy to GitHub Pages → Run workflow → branch: main → Run workflow
-```
-
-Or push to `main` if the workflow runs automatically.
-
-After deployment, test:
-
-```text
-https://jefmark.github.io/base-quest-milestones/
-```
-
-Use a hard refresh after changes:
-
-```text
-Ctrl + F5
-```
-
-On mobile:
-
-```text
-Close the tab
-Close the browser
-Open the site again
-```
+The WalletConnect Project ID is not a private key, but it should still be configured properly with domain/origin settings where possible.
 
 ---
 
-## Deploy or Manage the Contract with Remix
+## No-Server Anti-Cheat Model
 
-You can deploy and manage the contract with Remix.
+This project is a static frontend with no backend. The anti-cheat model is therefore limited.
 
-Basic Remix flow:
+It can block casual cheating in the normal website UI, but it is not a full security boundary.
 
-1. Open Remix.
-2. Add `BaseQuestMilestones.sol`.
-3. Compile with Solidity `0.8.24` or compatible.
-4. Go to `Deploy & Run Transactions`.
-5. Select the injected browser wallet environment.
-6. Make sure the wallet is on the correct Base network.
-7. Deploy the contract with:
-   - `initialOwner`
-   - `initialBaseURI`
+A technical user may bypass the frontend and call the contract directly from Remix, Basescan, a custom script, or another frontend.
 
-Example `initialBaseURI`:
-
-```text
-https://jefmark.github.io/base-quest-milestones/metadata/
-```
-
-The final slash is required.
-
-Correct:
-
-```text
-https://jefmark.github.io/base-quest-milestones/metadata/
-```
-
-Wrong:
-
-```text
-https://jefmark.github.io/base-quest-milestones/metadata
-```
+For high-value rewards, use a stronger model such as backend signed mint authorization, EIP-712 signed score proofs, on-chain game verification, commit-reveal gameplay, or zero-knowledge / deterministic proof systems.
 
 ---
 
-## Update Milestone Settings Without Redeploying
+## Known Issues and Limitations
 
-You do not need to redeploy the contract to change milestone score and time requirements.
+### 1. Mobile wallet browser double-connect behavior
 
-Use:
+Status:
 
-```solidity
-setMilestone(
-  uint256 milestone,
-  uint32 requiredScore,
-  uint32 minPlaySeconds,
-  bool active,
-  string calldata name
-)
+```txt
+Still exists.
 ```
 
-Recommended current settings:
+Description:
 
-```text
-1, 1200, 20, true, "Rookie Runner"
-2, 5000, 45, true, "Chain Jumper"
-3, 10000, 70, true, "Base Sprinter"
-4, 18000, 95, true, "Gasless Ghost"
-5, 30000, 125, true, "Block Master"
-6, 45000, 160, true, "Onchain Legend"
+On mobile, choosing MetaMask or Trust Wallet from Chrome may open the site inside the wallet internal browser. The user then needs to tap Connect Wallet again inside that wallet browser.
+
+Reason:
+
+The wallet provider is injected inside the wallet browser, not necessarily inside Android Chrome.
+
+Possible future improvements:
+
+- Add clearer UI instructions after mobile deeplink
+- Detect wallet browser and auto-open the wallet picker
+- Prefer WalletConnect as the default mobile path
+- Add a dedicated Open in wallet browser instruction screen
+- Use a full AppKit-style modal if the project later adopts a complete wallet UX SDK
+
+### 2. Rabby risk warning
+
+Rabby may show warnings such as:
+
+```txt
+Very Low popularity
+Not listed on community platforms
 ```
 
-After each transaction, verify with:
+This is not caused by the dApp code. It is related to domain reputation and wallet-side risk checks.
 
-```solidity
-getMilestone(1)
-getMilestone(2)
-getMilestone(3)
-getMilestone(4)
-getMilestone(5)
-getMilestone(6)
+Recommended improvements:
+
+- Use a custom production domain instead of only GitHub Pages
+- Verify domain metadata where available
+- Publish project information publicly
+- Add clear project links and metadata
+- Avoid suspicious redirects
+- Keep contract and frontend source public
+
+### 3. WalletConnect Project ID missing
+
+Error:
+
+```txt
+WalletConnect Project ID is missing.
 ```
 
----
+Cause:
 
-## Fix or Update NFT Metadata
-
-If NFT images do not appear on OpenSea, Element, or other marketplaces, check this order:
-
-### 1. Check `tokenURI`
-
-In Remix, call:
-
-```solidity
-tokenURI(1)
+```txt
+VITE_WALLETCONNECT_PROJECT_ID is missing in GitHub Variables
+VITE_WALLETCONNECT_PROJECT_ID is empty
+VITE_WALLETCONNECT_PROJECT_ID is placed in Secrets instead of Variables
+deploy-pages.yml does not pass vars.VITE_WALLETCONNECT_PROJECT_ID into env
+site was not redeployed after adding the variable
+browser is still showing cached old build
 ```
 
-If the token exists, it should return a URL like:
+Fix:
 
-```text
-https://jefmark.github.io/base-quest-milestones/metadata/2.json
+```txt
+1. Add VITE_WALLETCONNECT_PROJECT_ID to GitHub Repository Variables.
+2. Make sure deploy-pages.yml passes it into env.
+3. Deploy again.
+4. Hard refresh the site.
 ```
 
-The number can be different from the token ID because this contract maps token IDs to milestone numbers.
+### 4. GitHub Actions lock file error
 
-### 2. Open the returned JSON URL
+Error:
 
-The JSON must load without a 404 error.
-
-### 3. Check the `image` field
-
-It must be a real direct image URL.
-
-Correct:
-
-```text
-https://jefmark.github.io/base-quest-milestones/nft/2.png
+```txt
+Dependencies lock file is not found
 ```
 
-Wrong:
+Cause:
 
-```text
-https://YOUR_DOMAIN/nft/2.png
+The workflow used npm cache but the repository had no `package-lock.json`.
+
+Fix:
+
+Remove:
+
+```yaml
+cache: npm
 ```
 
-### 4. Open the image URL directly
+from the `actions/setup-node` step.
 
-The image must open in the browser.
+### 5. Mobile mint popup does not appear
 
-### 5. Refresh marketplace metadata
+Earlier behavior:
 
-After fixing JSON files, marketplaces may still show old data because they cache NFT metadata.
-
-Use the marketplace refresh option when available:
-
-```text
-NFT item page → More / three dots → Refresh metadata
+```txt
+Preparing mint...
+Waiting for wallet...
+No wallet gas popup appears
 ```
 
-If refresh is not available, wait and check again later.
+Fix implemented:
 
-### 6. Use a new metadata path if cache is stuck
+- Direct transaction request flow
+- More persistent mint status messages
+- Better error visibility
+- Wallet browser support
 
-If old metadata remains cached, create a new folder:
-
-```text
-public/metadata-v2/
-public/nft-v2/
-```
-
-Then update the contract:
-
-```solidity
-setBaseTokenURI("https://jefmark.github.io/base-quest-milestones/metadata-v2/")
-```
-
-This forces marketplaces to read a new URL path.
+If this happens again, check wallet network, ETH on Base for gas, contract address, milestone status, provider connection, and WalletConnect session.
 
 ---
 
@@ -785,102 +724,204 @@ This forces marketplaces to read a new URL path.
 
 Cause:
 
-```text
+```txt
 Frontend milestone settings do not match contract milestone settings.
 ```
 
 Fix:
 
-1. Check `src/game.js`.
-2. Check `getMilestone(n)` in Remix.
+```txt
+1. Check src/game.js.
+2. Check getMilestone(n) in Remix.
 3. Make both values the same.
-
----
+```
 
 ### NFT images do not show in OpenSea or Element
 
 Common causes:
 
-- `image` field still uses `YOUR_DOMAIN`.
-- Image URL returns 404.
-- JSON URL returns 404.
-- Base URI is wrong.
-- Missing trailing slash in base URI.
-- Marketplace metadata is cached.
+- `image` field still uses `YOUR_DOMAIN`
+- Image URL returns 404
+- JSON URL returns 404
+- Base URI is wrong
+- Missing trailing slash in base URI
+- Marketplace metadata is cached
 
 Fix:
 
-1. Open `tokenURI(tokenId)`.
+```txt
+1. Open tokenURI(tokenId).
 2. Open the JSON.
 3. Open the image URL.
 4. Fix JSON if needed.
-5. Use `setBaseTokenURI` if the base path is wrong.
+5. Use setBaseTokenURI if the base path is wrong.
 6. Refresh metadata on the marketplace.
-
----
-
-### I see two NFT number 2 items or two NFT number 4 items
-
-This can be normal.
-
-The contract metadata is based on milestone number, not token ID.
-
-If two users mint milestone 2, there will be two different tokens that both use:
-
-```text
-metadata/2.json
 ```
-
----
 
 ### Wallet connection fails
 
 Check:
 
-- Browser wallet is installed.
-- Wallet is on the correct chain.
-- `VITE_CHAIN_ID` is correct.
-- `VITE_RPC_URL` is correct.
-- `VITE_CONTRACT_ADDRESS` is set.
-- The deployed contract address is on the same chain as the frontend config.
-
----
+```txt
+Browser wallet is installed
+Wallet is on the correct chain
+VITE_CHAIN_ID is correct
+VITE_RPC_URL is correct
+VITE_CONTRACT_ADDRESS is set
+The deployed contract address is on the same chain as the frontend config
+VITE_WALLETCONNECT_PROJECT_ID is available in the build
+```
 
 ### GitHub Pages still shows the old version
 
 Fix:
 
+```txt
 1. Wait for the GitHub Actions workflow to finish.
 2. Check that the latest workflow is green.
-3. Hard refresh with `Ctrl + F5`.
+3. Hard refresh with Command + Shift + R.
 4. On mobile, close the browser and reopen the page.
 5. Check that repository variables are correct.
+```
 
 ---
 
-## Security Notes
+## Testing Checklist
 
-This project uses a low-risk mint model:
+### Desktop
 
-- No paid mint.
-- No ERC-20 approval.
-- No NFT approval.
-- No token transfer request from players.
-- No direct ETH acceptance.
+```txt
+Open site in Chrome
+Hard refresh with Command + Shift + R
+Connect MetaMask
+Connect Rabby
+Connect Coinbase if installed
+Open WalletConnect
+Confirm QR/modal appears
+Play game
+Unlock NFT
+Mint NFT
+Confirm transaction in wallet
+Confirm NFT preview appears after mint
+Disconnect wallet
+Reconnect
+```
 
-However, the current no-server anti-cheat is not a full security boundary.
+### Mobile
 
-A technical user may bypass the frontend and call the contract directly with custom score and time values. This is a known limitation of any no-server browser-only game that sends score values to a smart contract.
+```txt
+Open site in Android Chrome
+Tap Connect Wallet
+Choose MetaMask or Trust Wallet
+Confirm wallet browser opens
+Tap Connect Wallet again inside wallet browser
+Connect wallet
+Play game
+Tap anywhere on non-button page area to jump
+Unlock NFT
+Tap Mint
+Confirm gas popup appears
+Confirm NFT preview appears after mint
+```
 
-Do not use this design for:
+### Mobile WalletConnect
 
-- High-value rewards.
-- Token emissions.
-- Paid competitions.
-- Prize pools.
-- Financially sensitive game logic.
+```txt
+Open site
+Tap Connect Wallet
+Tap WalletConnect
+Confirm WalletConnect modal opens
+Choose wallet or scan QR from another device
+Connect wallet
+Play and mint
+```
 
-For production-grade rewards, use backend signature verification or a new smart contract design that verifies gameplay more strongly.
+---
+
+## Cache Notes
+
+After deployment, old files may remain cached.
+
+Desktop hard refresh:
+
+```txt
+Command + Shift + R
+```
+
+Mobile:
+
+```txt
+Close wallet browser tab
+Close wallet app if needed
+Open site again
+```
+
+If still stale:
+
+```txt
+Clear site data for jefmark.github.io
+```
+
+---
+
+## Reown / WalletConnect Domain Notes
+
+Recommended app URL:
+
+```txt
+https://jefmark.github.io/base-quest-milestones/
+```
+
+Recommended origin if an allowlist/origin field exists:
+
+```txt
+https://jefmark.github.io
+```
+
+Correct origin:
+
+```txt
+https://jefmark.github.io
+```
+
+Full app URL:
+
+```txt
+https://jefmark.github.io/base-quest-milestones/
+```
+
+---
+
+## Current Final Status
+
+Working:
+
+```txt
+Desktop wallet connection
+Mobile wallet browser connection
+Trust Wallet mobile browser connection
+MetaMask mobile browser connection
+Minting inside mobile wallet browser
+Game milestone unlock flow
+Mint-preserve behavior
+Mobile tap-to-jump
+NFT preview after successful mint
+GitHub Pages deployment
+```
+
+Still known limitation:
+
+```txt
+Mobile deeplink wallets may require two connection taps:
+one tap to open the wallet browser,
+another tap inside the wallet browser to connect.
+```
+
+Primary remaining improvement:
+
+```txt
+Improve mobile wallet UX so the second connect step is clearer or avoided where possible.
+```
 
 ---
 
@@ -888,25 +929,31 @@ For production-grade rewards, use backend signature verification or a new smart 
 
 Possible next steps:
 
-- Farcaster Mini App support.
-- Vercel deployment.
-- IPFS-hosted metadata.
-- Contract-level metadata with `contractURI`.
-- Backend signed mint authorization.
-- EIP-712 score signatures.
-- Better marketplace refresh workflow.
-- New game mode with stronger deterministic verification.
-- Leaderboard.
-- Daily challenges.
-- Better mobile controls.
-- Sound and accessibility settings.
-- Contract verification on Basescan.
+- Add a dedicated mobile wallet instruction screen
+- Make WalletConnect the recommended mobile path
+- Add automatic wallet-browser detection
+- Add clearer message after deeplink
+- Add custom production domain
+- Improve Rabby / wallet reputation by using verified metadata and public project links
+- Add `package-lock.json` for deterministic GitHub Actions installs
+- Add automated build checks before deploy
+- Add transaction hash display after mint
+- Add NFT marketplace / BaseScan links after mint
+- Farcaster Mini App support
+- Vercel deployment
+- IPFS-hosted metadata
+- Backend signed mint authorization
+- EIP-712 score signatures
+- Better marketplace refresh workflow
+- Leaderboard
+- Daily challenges
+- Better mobile controls
+- Sound and accessibility settings
+- Contract verification on Basescan
 
 ---
 
 ## Official References
-
-Use these official references when modifying or extending the project.
 
 - Vite Guide: https://vite.dev/guide/
 - Vite Production Build: https://vite.dev/guide/build
@@ -916,25 +963,36 @@ Use these official references when modifying or extending the project.
 - OpenSea Metadata Standards: https://docs.opensea.io/docs/metadata-standards
 - OpenSea Contract Metadata: https://docs.opensea.io/docs/contract-level-metadata
 - Base Network Details: https://docs.base.org/base-chain/quickstart/connecting-to-base
-- GitHub Actions Secrets: https://docs.github.com/actions/security-guides/using-secrets-in-github-actions
 - GitHub Actions Variables: https://docs.github.com/actions/learn-github-actions/variables
+- GitHub Actions Secrets: https://docs.github.com/actions/security-guides/using-secrets-in-github-actions
 - Hardhat Configuration: https://hardhat.org/docs/reference/configuration
 - Hardhat Deployment Overview: https://hardhat.org/docs/guides/deployment
 - Remix Deploy and Run: https://remix-ide.readthedocs.io/en/latest/run.html
+- Reown Cloud: https://cloud.reown.com/
+- WalletConnect / Reown Documentation: https://docs.reown.com/
 
-  
 ---
 
-Contact
+## Contact
 
-Have feedback, questions, or collaboration ideas?
+Have feedback, questions, bug reports, or collaboration ideas?
 
-- X / Twitter: "@Crypto30724" (https://x.com/Crypto30724)
-- Farcaster / Warpcast: "@Crypto30724" (https://warpcast.com/crypto30724)
-- Email: "Crypto30724@gmail.com" (mailto:Crypto30724@gmail.com)
+- X / Twitter: https://x.com/Crypto30724
+- Farcaster / Warpcast: https://warpcast.com/crypto30724
+- Email: Crypto30724@gmail.com
+- GitHub Issues: https://github.com/jefmark/base-quest-milestones/issues
 
-You can also open a GitHub issue if you find a bug or want to suggest an improvement.
+For bug reports, include:
 
+```txt
+Device
+Browser
+Wallet
+Network
+Screenshot
+Transaction hash if available
+Steps to reproduce
+```
 
 ---
 
