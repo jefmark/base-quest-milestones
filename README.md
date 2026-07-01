@@ -999,3 +999,6 @@ Steps to reproduce
 ## License
 
 MIT License.
+
+
+are provided for this project and demo use. Unless otherwise stated, the artwork remains owned by the project creator and should not be reused as standalone commercial artwork without permission.
