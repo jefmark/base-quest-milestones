@@ -1064,3 +1064,29 @@ code {
     flex: 1 1 150px;
   }
 }
+
+/* HTML redesign support */
+h1 span {
+  display: block;
+}
+
+.hero-card .actions {
+  margin-top: 2px;
+}
+
+.game-panel-head h2,
+.section-title h2,
+.safety-card h2 {
+  text-wrap: balance;
+}
+
+.milestone-card h3 {
+  min-height: 2.25em;
+}
+
+.milestone-card p,
+.safety-card p,
+.message,
+.status-text {
+  overflow-wrap: anywhere;
+}
