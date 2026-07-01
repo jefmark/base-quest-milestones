@@ -5,6 +5,7 @@ import { createGame, STAGE_CONFIG } from './game.js';
 import {
   disconnectWallet,
   getBalanceText,
+  hasMintedMilestone,
   mintMilestone,
   openWalletModal,
   shortAddress,
@@ -195,6 +196,8 @@ let connectInProgress = false;
 let disconnectInProgress = false;
 let mintInProgress = false;
 let mintedMilestones = new Set();
+let mintedSyncAccount = '';
+let mintedSyncPromise = null;
 let protectedMessageUntil = 0;
 
 function setProtectedMessage(message, ms = 15000) {
@@ -279,6 +282,82 @@ function updateMintButton(snapshot) {
   mintBtn.textContent = `Mint #${mintable.milestone} ${mintable.name}`;
 }
 
+async function syncMintedMilestones(force = false) {
+  const account = walletState.account ? walletState.account.toLowerCase() : '';
+
+  if (!account) {
+    mintedMilestones = new Set();
+    mintedSyncAccount = '';
+    mintedSyncPromise = null;
+    return;
+  }
+
+  if (!force && mintedSyncAccount === account) return;
+  if (mintedSyncPromise && !force) return mintedSyncPromise;
+
+  mintedSyncPromise = (async () => {
+    const nextMinted = new Set();
+
+    for (const milestone of STAGE_CONFIG) {
+      try {
+        if (await hasMintedMilestone(milestone.milestone)) {
+          nextMinted.add(milestone.milestone);
+        }
+      } catch (err) {
+        console.warn(`Could not check minted status for #${milestone.milestone}:`, err);
+      }
+    }
+
+    mintedMilestones = nextMinted;
+    mintedSyncAccount = account;
+    updateStats(lastSnapshot || game.snapshot());
+  })().finally(() => {
+    mintedSyncPromise = null;
+  });
+
+  return mintedSyncPromise;
+}
+
+function isMobileJumpInput() {
+  return Boolean(
+    window.matchMedia?.('(pointer: coarse)').matches ||
+    /Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent)
+  );
+}
+
+function shouldIgnoreMobileJumpTarget(target) {
+  return Boolean(target.closest(`
+    button,
+    a,
+    input,
+    select,
+    textarea,
+    label,
+    summary,
+    [role="button"],
+    [contenteditable="true"],
+    .wallet-actions,
+    .game-controls,
+    .mint-bar,
+    .bqm-wallet-overlay,
+    .bqm-wallet-modal,
+    .bqm-wallet-row,
+    .bqm-wallet-close
+  `));
+}
+
+function installMobilePageJump() {
+  document.addEventListener('pointerdown', (event) => {
+    if (!isMobileJumpInput()) return;
+    if (event.pointerType === 'mouse') return;
+    if (shouldIgnoreMobileJumpTarget(event.target)) return;
+    if (!event.target.closest('.shell')) return;
+
+    event.preventDefault();
+    game.jump();
+  }, { passive: false });
+}
+
 async function refreshWalletUi() {
   updateWalletButtons();
 
@@ -287,6 +366,8 @@ async function refreshWalletUi() {
     updateStats(lastSnapshot || game.snapshot());
     return;
   }
+
+  syncMintedMilestones().catch((err) => console.warn('Minted milestone sync failed:', err));
 
   try {
     const balance = await getBalanceText();
@@ -301,6 +382,9 @@ async function refreshWalletUi() {
 }
 
 const game = createGame($('#gameCanvas'), {
+  isMilestoneMinted(milestoneNumber) {
+    return mintedMilestones.has(Number(milestoneNumber));
+  },
   onUpdate: updateStats,
   onMilestone(snapshot) {
     updateStats(snapshot);
@@ -316,6 +400,10 @@ const game = createGame($('#gameCanvas'), {
   onGameOver(snapshot) {
     updateStats(snapshot);
     if (snapshot.mintAllowed && snapshot.mintableMilestone) {
+      if (mintedMilestones.has(snapshot.mintableMilestone.milestone)) {
+        messageEl.textContent = `${milestoneLabel(snapshot.mintableMilestone)} was already minted. Tap/Space can start the next run normally.`;
+        return;
+      }
       messageEl.textContent = `${milestoneLabel(snapshot.mintableMilestone)} is ready to mint. Accidental Space/tap will not restart this run. Use Mint NFT or press Start / Restart for a new run.`;
       return;
     }
@@ -352,6 +440,10 @@ function updateStats(snapshot) {
   }
 
   if (snapshot.mintableMilestone && snapshot.mintAllowed) {
+    if (mintedMilestones.has(snapshot.mintableMilestone.milestone)) {
+      messageEl.textContent = `${milestoneLabel(snapshot.mintableMilestone)} was already minted. You can continue playing with tap/Space or press Start / Restart.`;
+      return;
+    }
     messageEl.textContent = `${milestoneLabel(snapshot.mintableMilestone)} is mintable now. Accidental jump/tap will not restart it.`;
     return;
   }
@@ -389,6 +481,7 @@ connectBtn.addEventListener('click', async () => {
   try {
     await openWalletModal();
     walletStatus.textContent = 'Wallet list opened. On Android Chrome, choose MetaMask/Trust to open the app, or WalletConnect to stay on this page.';
+    await syncMintedMilestones(true).catch((err) => console.warn('Minted milestone sync failed:', err));
   } catch (err) {
     console.error(err);
     const message = err.shortMessage || err.message || 'Could not open wallet list.';
@@ -448,6 +541,7 @@ mintBtn.addEventListener('click', async () => {
     );
 
     mintedMilestones.add(payload.milestone);
+    mintedSyncAccount = walletState.account ? walletState.account.toLowerCase() : mintedSyncAccount;
     protectedMessageUntil = Date.now() + 60000;
     messageEl.innerHTML = `NFT minted. <a href="${CONFIG.explorerUrl}/tx/${result.hash}" target="_blank" rel="noreferrer">View transaction</a>`;
   } catch (err) {
@@ -461,6 +555,7 @@ mintBtn.addEventListener('click', async () => {
 });
 
 window.addEventListener('bqm-wallet-changed', refreshWalletUi);
+installMobilePageJump();
 
 updateSoundButton();
 updateWalletButtons();
