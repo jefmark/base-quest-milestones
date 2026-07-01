@@ -576,6 +576,16 @@ async function getWalletConnectProvider() {
       events: REQUIRED_EVENTS,
       optionalEvents: REQUIRED_EVENTS,
       showQrModal: true,
+      qrModalOptions: {
+        themeMode: 'dark',
+        enableExplorer: true,
+        explorerRecommendedWalletIds: 'NONE',
+        themeVariables: {
+          '--wcm-z-index': '2147483647',
+          '--wcm-accent-color': '#3b82f6',
+          '--wcm-background-color': '#0b1220',
+        },
+      },
       rpcMap: {
         [BASE_CHAIN_ID]: CONFIG.rpcUrl,
       },
@@ -616,8 +626,8 @@ async function connectWithProvider(provider, label = 'Wallet', type = 'injected'
 async function connectWalletConnect() {
   let provider = await getWalletConnectProvider();
 
-  // A stale WalletConnect session can make the QR/modal appear to do nothing.
-  // If there is no usable account, reset that session and open a fresh QR/mobile modal.
+  // If there is an actually usable session, reuse it. If the session is stale,
+  // destroy it so WalletConnect opens a fresh QR/mobile modal instead of doing nothing.
   if (provider.session) {
     const existingAccounts = await provider
       .request({ method: 'eth_accounts' })
@@ -636,19 +646,15 @@ async function connectWalletConnect() {
     provider = await getWalletConnectProvider();
   }
 
-  if (typeof provider.enable === 'function') {
-    await withTimeout(
-      provider.enable(),
-      120000,
-      'WalletConnect did not open. Check pop-up blocking, then try again or refresh the page.'
-    );
-  } else {
-    await withTimeout(
-      provider.connect(),
-      120000,
-      'WalletConnect did not open. Check pop-up blocking, then try again or refresh the page.'
-    );
-  }
+  const openWalletConnect = typeof provider.enable === 'function'
+    ? provider.enable.bind(provider)
+    : provider.connect.bind(provider);
+
+  await withTimeout(
+    openWalletConnect(),
+    120000,
+    'WalletConnect modal did not open. Refresh the page and check that VITE_WALLETCONNECT_PROJECT_ID is set correctly.'
+  );
 
   return connectWithProvider(provider, 'WalletConnect', 'walletconnect');
 }
@@ -662,23 +668,24 @@ function installPickerStyles() {
     .bqm-wallet-overlay {
       position: fixed;
       inset: 0;
-      z-index: 2147483647;
+      z-index: 999900;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 16px;
       background: rgba(2, 6, 23, 0.72);
-      backdrop-filter: blur(10px);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
     }
     .bqm-wallet-modal {
-      width: min(460px, 100%);
-      max-height: min(760px, 92vh);
+      width: min(500px, 100%);
+      max-height: min(790px, 92vh);
       overflow: auto;
       border: 1px solid rgba(148, 163, 184, 0.26);
-      border-radius: 22px;
-      background: #0b1220;
+      border-radius: 24px;
+      background: linear-gradient(180deg, #0b1220, #060b16);
       color: #e5e7eb;
-      box-shadow: 0 30px 100px rgba(0, 0, 0, 0.55);
+      box-shadow: 0 30px 100px rgba(0, 0, 0, 0.58);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
     .bqm-wallet-head {
@@ -692,8 +699,9 @@ function installPickerStyles() {
     .bqm-wallet-title {
       margin: 0;
       font-size: 18px;
-      font-weight: 800;
+      font-weight: 900;
       color: #f8fafc;
+      letter-spacing: -0.02em;
     }
     .bqm-wallet-subtitle {
       margin: 6px 0 0;
@@ -702,38 +710,38 @@ function installPickerStyles() {
       line-height: 1.45;
     }
     .bqm-wallet-close {
-      width: 36px;
-      height: 36px;
+      width: 38px;
+      height: 38px;
       border: 1px solid rgba(148, 163, 184, 0.26);
       border-radius: 999px;
       color: #e5e7eb;
       background: rgba(15, 23, 42, 0.95);
       cursor: pointer;
-      font-size: 20px;
+      font-size: 22px;
       line-height: 1;
     }
     .bqm-wallet-list {
       display: grid;
-      gap: 10px;
+      gap: 11px;
       padding: 16px;
     }
     .bqm-wallet-row {
       width: 100%;
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 12px;
+      gap: 13px;
+      padding: 13px;
       border: 1px solid rgba(148, 163, 184, 0.18);
-      border-radius: 16px;
-      background: rgba(15, 23, 42, 0.82);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.72));
       color: #e5e7eb;
       text-align: left;
       cursor: pointer;
     }
     .bqm-wallet-row:hover,
     .bqm-wallet-row:focus-visible {
-      border-color: rgba(59, 130, 246, 0.78);
-      background: rgba(30, 41, 59, 0.92);
+      border-color: rgba(59, 130, 246, 0.8);
+      background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.92));
       outline: none;
     }
     .bqm-wallet-row[disabled] {
@@ -741,23 +749,31 @@ function installPickerStyles() {
       cursor: progress;
     }
     .bqm-wallet-icon {
-      width: 42px;
-      height: 42px;
-      flex: 0 0 42px;
-      border-radius: 14px;
+      width: 50px;
+      height: 50px;
+      flex: 0 0 50px;
+      border-radius: 16px;
       display: grid;
       place-items: center;
       overflow: hidden;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.10);
-      box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
+      background: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 10px 28px rgba(0,0,0,.22), inset 0 0 0 1px rgba(15, 23, 42, 0.04);
     }
     .bqm-wallet-icon img {
       width: 100%;
       height: 100%;
       display: block;
-      object-fit: cover;
-      border-radius: 14px;
+      object-fit: contain;
+      padding: 6px;
+      border-radius: 15px;
+    }
+    .bqm-wallet-row[data-wallet-id='okx'] .bqm-wallet-icon,
+    .bqm-wallet-row[data-wallet-id='browser'] .bqm-wallet-icon {
+      background: #0f172a;
+    }
+    .bqm-wallet-row[data-wallet-id='walletconnect'] .bqm-wallet-icon {
+      background: #3b99fc;
     }
     .bqm-wallet-main {
       min-width: 0;
@@ -769,8 +785,9 @@ function installPickerStyles() {
       flex-wrap: wrap;
       gap: 8px;
       font-size: 15px;
-      font-weight: 800;
+      font-weight: 900;
       color: #f8fafc;
+      letter-spacing: -0.01em;
     }
     .bqm-wallet-desc {
       margin-top: 4px;
@@ -784,10 +801,11 @@ function installPickerStyles() {
       border-radius: 999px;
       padding: 3px 8px;
       font-size: 11px;
-      font-weight: 800;
+      font-weight: 900;
       background: rgba(34, 197, 94, 0.14);
       color: #86efac;
       border: 1px solid rgba(34, 197, 94, 0.22);
+      white-space: nowrap;
     }
     .bqm-wallet-badge.install {
       background: rgba(251, 191, 36, 0.12);
@@ -809,7 +827,54 @@ function installPickerStyles() {
       .bqm-wallet-modal {
         width: 100%;
         max-height: 92vh;
-        border-radius: 22px 22px 0 0;
+        border-radius: 24px 24px 0 0;
+      }
+      .bqm-wallet-head {
+        padding: 18px 18px 12px;
+      }
+      .bqm-wallet-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        padding: 12px;
+      }
+      .bqm-wallet-row {
+        min-height: 142px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        text-align: center;
+        gap: 9px;
+        padding: 12px 8px;
+        border-radius: 18px;
+      }
+      .bqm-wallet-icon {
+        width: 58px;
+        height: 58px;
+        flex-basis: 58px;
+        border-radius: 18px;
+      }
+      .bqm-wallet-icon img {
+        padding: 6px;
+        border-radius: 17px;
+      }
+      .bqm-wallet-main {
+        width: 100%;
+      }
+      .bqm-wallet-name {
+        justify-content: center;
+        gap: 6px;
+        font-size: 13.5px;
+      }
+      .bqm-wallet-desc {
+        display: none;
+      }
+      .bqm-wallet-badge {
+        padding: 3px 7px;
+        font-size: 10px;
+      }
+      .bqm-wallet-status {
+        padding: 2px 16px 16px;
+        font-size: 12.5px;
       }
     }
   `;
@@ -846,7 +911,7 @@ function walletDescription(wallet, installed) {
   if (wallet.id === WALLETCONNECT_ID) return 'Connect MetaMask, Trust Wallet, Coinbase Wallet and other EVM wallets by mobile deep link or QR.';
   if (wallet.id === BROWSER_WALLET_ID) return installed ? 'Uses the currently active injected EVM provider.' : 'No injected EVM provider was detected in this browser.';
   if (installed) return `${wallet.subtitle}. Detected in this browser.`;
-  if (isMobile() && wallet.mobileOpenUrl) return `${wallet.subtitle}. Uses WalletConnect on mobile so the game page stays open.`;
+  if (isMobile() && wallet.mobileOpenUrl) return `${wallet.subtitle}. Opens the installed wallet app/browser on mobile.`;
   return `${wallet.subtitle}. Not installed in this browser.`;
 }
 
@@ -932,8 +997,10 @@ async function handleWalletPick(walletId) {
   try {
     if (walletId === WALLETCONNECT_ID) {
       setPickerMessage('Opening WalletConnect. Choose your mobile wallet or scan the QR code.');
-      await connectWalletConnect();
+      // Critical: the custom wallet picker overlay used a very high z-index and
+      // could cover the WalletConnect QR modal. Close it before opening WalletConnect.
       closeWalletPicker();
+      await connectWalletConnect();
       return;
     }
 
@@ -967,7 +1034,9 @@ async function handleWalletPick(walletId) {
     throw new Error(`${wallet.name} is not available in this browser. Use WalletConnect instead.`);
   } catch (err) {
     console.error(err);
-    setPickerMessage(err.shortMessage || err.message || 'Wallet connection failed.');
+    const message = err.shortMessage || err.message || 'Wallet connection failed.';
+    if (pickerRoot) setPickerMessage(message);
+    else if (isBrowser()) window.alert(message);
   } finally {
     pickerState.isConnecting = false;
     renderWalletPicker();
