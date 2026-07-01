@@ -524,6 +524,58 @@ disconnectBtn.addEventListener('click', async () => {
   }
 });
 
+
+function appAssetUrl(path) {
+  const base = import.meta.env.BASE_URL || '/';
+  const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+  return `${normalizedBase}${String(path).replace(/^\//, '')}`;
+}
+
+function nftImageUrl(milestone) {
+  const safeMilestone = Math.max(1, Math.min(CONFIG.maxMilestone || 6, Math.floor(Number(milestone) || 1)));
+  return appAssetUrl(`nft/${safeMilestone}.png`);
+}
+
+function removeMintPreview() {
+  document.querySelector('.mint-preview-overlay')?.remove();
+}
+
+function showMintedNftPreview({ milestone, name, txHash }) {
+  removeMintPreview();
+
+  const imageUrl = nftImageUrl(milestone);
+  const explorerUrl = txHash ? `${CONFIG.explorerUrl}/tx/${txHash}` : '';
+  const overlay = document.createElement('div');
+  overlay.className = 'mint-preview-overlay';
+  overlay.innerHTML = `
+    <section class="mint-preview-card" role="dialog" aria-modal="true" aria-label="Minted NFT preview">
+      <button class="mint-preview-close" type="button" aria-label="Close minted NFT preview">×</button>
+      <div class="mint-preview-badge">Mint successful</div>
+      <div class="mint-preview-art-wrap">
+        <img class="mint-preview-art" src="${imageUrl}" alt="Milestone ${milestone} NFT" loading="eager" decoding="async">
+      </div>
+      <h2>Your NFT is minted</h2>
+      <p class="mint-preview-title">#${milestone} ${name || 'Base Quest Milestone'}</p>
+      <div class="mint-preview-actions">
+        ${explorerUrl ? `<a class="mint-preview-link" href="${explorerUrl}" target="_blank" rel="noreferrer">View transaction</a>` : ''}
+        <button class="mint-preview-secondary" type="button">Close</button>
+      </div>
+    </section>
+  `;
+
+  overlay.addEventListener('click', (event) => {
+    if (
+      event.target === overlay ||
+      event.target.closest('.mint-preview-close') ||
+      event.target.closest('.mint-preview-secondary')
+    ) {
+      removeMintPreview();
+    }
+  });
+
+  document.body.appendChild(overlay);
+}
+
 mintBtn.addEventListener('click', async () => {
   if (mintInProgress) return;
 
@@ -550,7 +602,12 @@ mintBtn.addEventListener('click', async () => {
     mintedMilestones.add(payload.milestone);
     mintedSyncAccount = walletState.account ? walletState.account.toLowerCase() : mintedSyncAccount;
     protectedMessageUntil = Date.now() + 60000;
-    messageEl.innerHTML = `NFT minted. <a href="${CONFIG.explorerUrl}/tx/${result.hash}" target="_blank" rel="noreferrer">View transaction</a>`;
+    messageEl.innerHTML = `NFT #${payload.milestone} minted. <a href="${CONFIG.explorerUrl}/tx/${result.hash}" target="_blank" rel="noreferrer">View transaction</a>`;
+    showMintedNftPreview({
+      milestone: payload.milestone,
+      name: mintable.name,
+      txHash: result.hash,
+    });
   } catch (err) {
     console.error(err);
     setProtectedMessage(err.shortMessage || err.message || 'Mint failed.', 30000);
