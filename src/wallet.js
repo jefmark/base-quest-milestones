@@ -104,6 +104,53 @@ const KNOWN_WALLETS = [
   },
 ];
 
+
+const svgToDataUri = (svg) => `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+
+const INLINE_WALLET_ICONS = {
+  metamask: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#fff3e6"/><path d="M11 18l17-9 8 7-5 8-9-2z" fill="#e27625"/><path d="M53 18L36 9l-8 7 5 8 9-2z" fill="#e27625"/><path d="M22 23l9 4-3 8-10-3z" fill="#f6851b"/><path d="M42 23l-9 4 3 8 10-3z" fill="#f6851b"/><path d="M28 35l4 3 4-3 7 4-5 8-6-3-6 3-5-8z" fill="#c0ad9e"/><path d="M18 32l10 3-2 12-8-6z" fill="#763d16"/><path d="M46 32l-10 3 2 12 8-6z" fill="#763d16"/><path d="M26 47l6-3 6 3-2 5h-8z" fill="#f6851b"/></svg>`),
+  trust: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#3375bb"/><path d="M32 10l17 7v12c0 11-6.7 20.5-17 24.8C21.7 49.5 15 40 15 29V17z" fill="#fff"/><path d="M32 18l10 4v7c0 6.4-3.7 12.4-10 15.7C25.7 41.4 22 35.4 22 29v-7z" fill="#3375bb"/></svg>`),
+  coinbase: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#0052ff"/><circle cx="32" cy="32" r="20" fill="#fff"/><circle cx="32" cy="32" r="9" fill="#0052ff"/></svg>`),
+  rabby: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#6c5ce7"/><path d="M22 23c-4-8 0-14 5-14 4 0 5 5 3 13z" fill="#fff"/><path d="M42 23c4-8 0-14-5-14-4 0-5 5-3 13z" fill="#fff"/><circle cx="32" cy="36" r="15" fill="#fff"/><circle cx="27" cy="34" r="2.5" fill="#6c5ce7"/><circle cx="37" cy="34" r="2.5" fill="#6c5ce7"/><path d="M27 42c3.2 2.2 6.8 2.2 10 0" stroke="#6c5ce7" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`),
+  rainbow: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#fff"/><path d="M14 41a18 18 0 0136 0" stroke="#ff4d4d" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M20 41a12 12 0 0124 0" stroke="#ffb84d" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M26 41a6 6 0 0112 0" stroke="#4d79ff" stroke-width="7" fill="none" stroke-linecap="round"/></svg>`),
+  okx: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#111"/><g fill="#fff"><rect x="14" y="14" width="11" height="11" rx="2"/><rect x="39" y="14" width="11" height="11" rx="2"/><rect x="26.5" y="26.5" width="11" height="11" rx="2"/><rect x="14" y="39" width="11" height="11" rx="2"/><rect x="39" y="39" width="11" height="11" rx="2"/></g></svg>`),
+  zerion: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#2962ff"/><path d="M18 21h29L18 43h29" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`),
+  browser: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#0f172a"/><rect x="12" y="16" width="40" height="32" rx="8" fill="#fff"/><circle cx="21" cy="24" r="2.5" fill="#60a5fa"/><circle cx="28" cy="24" r="2.5" fill="#34d399"/><circle cx="35" cy="24" r="2.5" fill="#f59e0b"/><path d="M19 33h26M19 39h17" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/></svg>`),
+  walletconnect: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#3b99fc"/><path d="M19 27c7.3-7.1 18.7-7.1 26 0l3 3a2 2 0 010 2.8l-3 3a1.4 1.4 0 01-2 0l-4-4c-4-3.9-10-3.9-14 0l-4 4a1.4 1.4 0 01-2 0l-3-3a2 2 0 010-2.8z" fill="#fff"/><path d="M26 36c3.5-3.2 8.5-3.2 12 0l1 1-4 4-1-1a3 3 0 00-4 0l-1 1-4-4z" fill="#fff"/></svg>`),
+};
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function safeWalletIconSrc(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^(data:image\/|https:\/\/|http:\/\/)/i.test(raw)) return raw;
+  return '';
+}
+
+function walletIconFor(wallet, installedProvider) {
+  const providerIcon = safeWalletIconSrc(installedProvider?.info?.icon || installedProvider?.provider?.icon);
+  if (providerIcon) return providerIcon;
+
+  const id = normalize(wallet?.id || wallet?.name);
+  if (id.includes('metamask')) return INLINE_WALLET_ICONS.metamask;
+  if (id.includes('trust')) return INLINE_WALLET_ICONS.trust;
+  if (id.includes('coinbase')) return INLINE_WALLET_ICONS.coinbase;
+  if (id.includes('rabby')) return INLINE_WALLET_ICONS.rabby;
+  if (id.includes('rainbow')) return INLINE_WALLET_ICONS.rainbow;
+  if (id.includes('okx')) return INLINE_WALLET_ICONS.okx;
+  if (id.includes('zerion')) return INLINE_WALLET_ICONS.zerion;
+  if (id.includes('walletconnect')) return INLINE_WALLET_ICONS.walletconnect;
+  return INLINE_WALLET_ICONS.browser;
+}
+
 let walletConnectProvider = null;
 let discoveredProviders = [];
 let discoveryPromise = null;
@@ -567,12 +614,40 @@ async function connectWithProvider(provider, label = 'Wallet', type = 'injected'
 }
 
 async function connectWalletConnect() {
-  const provider = await getWalletConnectProvider();
+  let provider = await getWalletConnectProvider();
 
-  if (!provider.session) {
-    await provider.connect();
+  // A stale WalletConnect session can make the QR/modal appear to do nothing.
+  // If there is no usable account, reset that session and open a fresh QR/mobile modal.
+  if (provider.session) {
+    const existingAccounts = await provider
+      .request({ method: 'eth_accounts' })
+      .catch(() => []);
+
+    if (existingAccounts?.[0]) {
+      return connectWithProvider(provider, 'WalletConnect', 'walletconnect');
+    }
+
+    try {
+      await provider.disconnect();
+    } catch (err) {
+      console.warn('Could not clear stale WalletConnect session:', err);
+    }
+    walletConnectProvider = null;
+    provider = await getWalletConnectProvider();
+  }
+
+  if (typeof provider.enable === 'function') {
+    await withTimeout(
+      provider.enable(),
+      120000,
+      'WalletConnect did not open. Check pop-up blocking, then try again or refresh the page.'
+    );
   } else {
-    await provider.request({ method: 'eth_requestAccounts' }).catch(() => null);
+    await withTimeout(
+      provider.connect(),
+      120000,
+      'WalletConnect did not open. Check pop-up blocking, then try again or refresh the page.'
+    );
   }
 
   return connectWithProvider(provider, 'WalletConnect', 'walletconnect');
@@ -666,15 +741,23 @@ function installPickerStyles() {
       cursor: progress;
     }
     .bqm-wallet-icon {
-      width: 40px;
-      height: 40px;
-      flex: 0 0 40px;
+      width: 42px;
+      height: 42px;
+      flex: 0 0 42px;
       border-radius: 14px;
       display: grid;
       place-items: center;
-      background: linear-gradient(135deg, #2563eb, #7c3aed);
-      font-weight: 900;
-      color: white;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
+    }
+    .bqm-wallet-icon img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      border-radius: 14px;
     }
     .bqm-wallet-main {
       min-width: 0;
@@ -786,15 +869,21 @@ function renderWalletPicker() {
     const installed = Boolean(installedProvider) || wallet.id === WALLETCONNECT_ID;
     const badgeClass = installed || (isMobile() && wallet.mobileOpenUrl) ? '' : ' install';
     const disabled = pickerState.isConnecting ? 'disabled' : '';
+    const iconSrc = walletIconFor(wallet, installedProvider);
+    const status = walletStatusLabel(wallet, installedProvider || wallet.id === WALLETCONNECT_ID);
+    const description = walletDescription(wallet, installedProvider || wallet.id === WALLETCONNECT_ID);
+
     return `
-      <button class="bqm-wallet-row" type="button" data-wallet-id="${wallet.id}" ${disabled}>
-        <span class="bqm-wallet-icon">${walletInitials(wallet.name)}</span>
+      <button class="bqm-wallet-row" type="button" data-wallet-id="${escapeHtml(wallet.id)}" ${disabled}>
+        <span class="bqm-wallet-icon" aria-hidden="true">
+          <img src="${escapeHtml(iconSrc)}" alt="" loading="lazy" decoding="async">
+        </span>
         <span class="bqm-wallet-main">
           <span class="bqm-wallet-name">
-            ${wallet.name}
-            <span class="bqm-wallet-badge${badgeClass}">${walletStatusLabel(wallet, installedProvider || wallet.id === WALLETCONNECT_ID)}</span>
+            ${escapeHtml(wallet.name)}
+            <span class="bqm-wallet-badge${badgeClass}">${escapeHtml(status)}</span>
           </span>
-          <span class="bqm-wallet-desc">${walletDescription(wallet, installedProvider || wallet.id === WALLETCONNECT_ID)}</span>
+          <span class="bqm-wallet-desc">${escapeHtml(description)}</span>
         </span>
       </button>
     `;
