@@ -1,5 +1,13 @@
 import { BrowserProvider, Contract, Interface, formatUnits } from 'ethers';
 import EthereumProvider from '@walletconnect/ethereum-provider';
+import metamaskSvg from '@web3icons/core/svgs/wallets/branded/metamask.svg.js';
+import trustSvg from '@web3icons/core/svgs/wallets/branded/trust.svg.js';
+import coinbaseSvg from '@web3icons/core/svgs/wallets/branded/coinbase.svg.js';
+import rabbySvg from '@web3icons/core/svgs/wallets/branded/rabby.svg.js';
+import rainbowSvg from '@web3icons/core/svgs/wallets/branded/rainbow.svg.js';
+import okxSvg from '@web3icons/core/svgs/wallets/branded/okx.svg.js';
+import zerionSvg from '@web3icons/core/svgs/wallets/branded/zerion.svg.js';
+import walletConnectSvg from '@web3icons/core/svgs/wallets/branded/wallet-connect.svg.js';
 
 import { CONFIG, CONTRACT_ABI } from './config.js';
 
@@ -107,16 +115,16 @@ const KNOWN_WALLETS = [
 
 const svgToDataUri = (svg) => `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 
-const INLINE_WALLET_ICONS = {
-  metamask: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#fff3e6"/><path d="M11 18l17-9 8 7-5 8-9-2z" fill="#e27625"/><path d="M53 18L36 9l-8 7 5 8 9-2z" fill="#e27625"/><path d="M22 23l9 4-3 8-10-3z" fill="#f6851b"/><path d="M42 23l-9 4 3 8 10-3z" fill="#f6851b"/><path d="M28 35l4 3 4-3 7 4-5 8-6-3-6 3-5-8z" fill="#c0ad9e"/><path d="M18 32l10 3-2 12-8-6z" fill="#763d16"/><path d="M46 32l-10 3 2 12 8-6z" fill="#763d16"/><path d="M26 47l6-3 6 3-2 5h-8z" fill="#f6851b"/></svg>`),
-  trust: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#3375bb"/><path d="M32 10l17 7v12c0 11-6.7 20.5-17 24.8C21.7 49.5 15 40 15 29V17z" fill="#fff"/><path d="M32 18l10 4v7c0 6.4-3.7 12.4-10 15.7C25.7 41.4 22 35.4 22 29v-7z" fill="#3375bb"/></svg>`),
-  coinbase: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#0052ff"/><circle cx="32" cy="32" r="20" fill="#fff"/><circle cx="32" cy="32" r="9" fill="#0052ff"/></svg>`),
-  rabby: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#6c5ce7"/><path d="M22 23c-4-8 0-14 5-14 4 0 5 5 3 13z" fill="#fff"/><path d="M42 23c4-8 0-14-5-14-4 0-5 5-3 13z" fill="#fff"/><circle cx="32" cy="36" r="15" fill="#fff"/><circle cx="27" cy="34" r="2.5" fill="#6c5ce7"/><circle cx="37" cy="34" r="2.5" fill="#6c5ce7"/><path d="M27 42c3.2 2.2 6.8 2.2 10 0" stroke="#6c5ce7" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`),
-  rainbow: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#fff"/><path d="M14 41a18 18 0 0136 0" stroke="#ff4d4d" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M20 41a12 12 0 0124 0" stroke="#ffb84d" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M26 41a6 6 0 0112 0" stroke="#4d79ff" stroke-width="7" fill="none" stroke-linecap="round"/></svg>`),
-  okx: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#111"/><g fill="#fff"><rect x="14" y="14" width="11" height="11" rx="2"/><rect x="39" y="14" width="11" height="11" rx="2"/><rect x="26.5" y="26.5" width="11" height="11" rx="2"/><rect x="14" y="39" width="11" height="11" rx="2"/><rect x="39" y="39" width="11" height="11" rx="2"/></g></svg>`),
-  zerion: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#2962ff"/><path d="M18 21h29L18 43h29" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`),
+const WALLET_ICONS = {
+  metamask: svgToDataUri(metamaskSvg),
+  trust: svgToDataUri(trustSvg),
+  coinbase: svgToDataUri(coinbaseSvg),
+  rabby: svgToDataUri(rabbySvg),
+  rainbow: svgToDataUri(rainbowSvg),
+  okx: svgToDataUri(okxSvg),
+  zerion: svgToDataUri(zerionSvg),
+  walletconnect: svgToDataUri(walletConnectSvg),
   browser: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#0f172a"/><rect x="12" y="16" width="40" height="32" rx="8" fill="#fff"/><circle cx="21" cy="24" r="2.5" fill="#60a5fa"/><circle cx="28" cy="24" r="2.5" fill="#34d399"/><circle cx="35" cy="24" r="2.5" fill="#f59e0b"/><path d="M19 33h26M19 39h17" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/></svg>`),
-  walletconnect: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#3b99fc"/><path d="M19 27c7.3-7.1 18.7-7.1 26 0l3 3a2 2 0 010 2.8l-3 3a1.4 1.4 0 01-2 0l-4-4c-4-3.9-10-3.9-14 0l-4 4a1.4 1.4 0 01-2 0l-3-3a2 2 0 010-2.8z" fill="#fff"/><path d="M26 36c3.5-3.2 8.5-3.2 12 0l1 1-4 4-1-1a3 3 0 00-4 0l-1 1-4-4z" fill="#fff"/></svg>`),
 };
 
 function escapeHtml(value) {
@@ -140,15 +148,15 @@ function walletIconFor(wallet, installedProvider) {
   if (providerIcon) return providerIcon;
 
   const id = normalize(wallet?.id || wallet?.name);
-  if (id.includes('metamask')) return INLINE_WALLET_ICONS.metamask;
-  if (id.includes('trust')) return INLINE_WALLET_ICONS.trust;
-  if (id.includes('coinbase')) return INLINE_WALLET_ICONS.coinbase;
-  if (id.includes('rabby')) return INLINE_WALLET_ICONS.rabby;
-  if (id.includes('rainbow')) return INLINE_WALLET_ICONS.rainbow;
-  if (id.includes('okx')) return INLINE_WALLET_ICONS.okx;
-  if (id.includes('zerion')) return INLINE_WALLET_ICONS.zerion;
-  if (id.includes('walletconnect')) return INLINE_WALLET_ICONS.walletconnect;
-  return INLINE_WALLET_ICONS.browser;
+  if (id.includes('metamask')) return WALLET_ICONS.metamask;
+  if (id.includes('trust')) return WALLET_ICONS.trust;
+  if (id.includes('coinbase')) return WALLET_ICONS.coinbase;
+  if (id.includes('rabby')) return WALLET_ICONS.rabby;
+  if (id.includes('rainbow')) return WALLET_ICONS.rainbow;
+  if (id.includes('okx')) return WALLET_ICONS.okx;
+  if (id.includes('zerion')) return WALLET_ICONS.zerion;
+  if (id.includes('walletconnect')) return WALLET_ICONS.walletconnect;
+  return WALLET_ICONS.browser;
 }
 
 let walletConnectProvider = null;
@@ -562,7 +570,7 @@ function walletConnectMetadata() {
 async function getWalletConnectProvider() {
   if (!CONFIG.walletConnectProjectId) {
     throw new Error(
-      'WalletConnect Project ID is missing. Add VITE_WALLETCONNECT_PROJECT_ID in GitHub Actions variables and deploy again.'
+      'WalletConnect Project ID is missing. In GitHub repo Settings → Secrets and variables → Actions → Variables, add VITE_WALLETCONNECT_PROJECT_ID and deploy again.'
     );
   }
 
@@ -579,7 +587,6 @@ async function getWalletConnectProvider() {
       qrModalOptions: {
         themeMode: 'dark',
         enableExplorer: true,
-        explorerRecommendedWalletIds: 'NONE',
         themeVariables: {
           '--wcm-z-index': '2147483647',
           '--wcm-accent-color': '#3b82f6',
@@ -646,14 +653,18 @@ async function connectWalletConnect() {
     provider = await getWalletConnectProvider();
   }
 
-  const openWalletConnect = typeof provider.enable === 'function'
-    ? provider.enable.bind(provider)
-    : provider.connect.bind(provider);
+  const connectPromise = typeof provider.connect === 'function'
+    ? provider.connect({
+        chains: [BASE_CHAIN_ID],
+        optionalChains: [BASE_CHAIN_ID],
+        rpcMap: { [BASE_CHAIN_ID]: CONFIG.rpcUrl },
+      })
+    : provider.enable();
 
   await withTimeout(
-    openWalletConnect(),
+    connectPromise,
     120000,
-    'WalletConnect modal did not open. Refresh the page and check that VITE_WALLETCONNECT_PROJECT_ID is set correctly.'
+    'WalletConnect modal did not open. Confirm VITE_WALLETCONNECT_PROJECT_ID is set in GitHub Actions Variables, then hard-refresh and try again.'
   );
 
   return connectWithProvider(provider, 'WalletConnect', 'walletconnect');
@@ -833,42 +844,49 @@ function installPickerStyles() {
         padding: 18px 18px 12px;
       }
       .bqm-wallet-list {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 9px;
         padding: 12px;
       }
       .bqm-wallet-row {
-        min-height: 142px;
-        flex-direction: column;
+        min-height: 72px;
+        flex-direction: row;
         align-items: center;
         justify-content: flex-start;
-        text-align: center;
-        gap: 9px;
-        padding: 12px 8px;
+        text-align: left;
+        gap: 12px;
+        padding: 11px 12px;
         border-radius: 18px;
       }
       .bqm-wallet-icon {
-        width: 58px;
-        height: 58px;
-        flex-basis: 58px;
-        border-radius: 18px;
+        width: 44px;
+        height: 44px;
+        flex: 0 0 44px;
+        border-radius: 13px;
       }
       .bqm-wallet-icon img {
-        padding: 6px;
-        border-radius: 17px;
+        padding: 3px;
+        border-radius: 12px;
       }
       .bqm-wallet-main {
-        width: 100%;
+        width: auto;
+        min-width: 0;
       }
       .bqm-wallet-name {
-        justify-content: center;
-        gap: 6px;
-        font-size: 13.5px;
+        justify-content: flex-start;
+        gap: 7px;
+        font-size: 14.5px;
       }
       .bqm-wallet-desc {
-        display: none;
+        display: block;
+        font-size: 11.5px;
+        line-height: 1.25;
+        max-height: 2.5em;
+        overflow: hidden;
       }
       .bqm-wallet-badge {
+        margin-left: auto;
         padding: 3px 7px;
         font-size: 10px;
       }
@@ -899,7 +917,7 @@ function walletInitials(name) {
 }
 
 function walletStatusLabel(wallet, installed) {
-  if (wallet.id === WALLETCONNECT_ID) return 'Mobile / QR';
+  if (wallet.id === WALLETCONNECT_ID) return CONFIG.walletConnectProjectId ? 'Mobile / QR' : 'Set Project ID';
   if (installed) return 'Installed';
   if (isMobile() && wallet.mobileOpenUrl) return 'Mobile ready';
   if (wallet.id === BROWSER_WALLET_ID) return installed ? 'Detected' : 'Unavailable';
@@ -908,7 +926,7 @@ function walletStatusLabel(wallet, installed) {
 
 function walletDescription(wallet, installed) {
   if (wallet.id === 'rabby') return installed ? 'Detected in this browser. Rabby may show a reputation warning for new GitHub Pages domains; this is controlled by Rabby, not by the dapp code.' : 'Rabby desktop wallet. New GitHub Pages domains may show Rabby reputation warnings until the site gains reputation/listings.';
-  if (wallet.id === WALLETCONNECT_ID) return 'Connect MetaMask, Trust Wallet, Coinbase Wallet and other EVM wallets by mobile deep link or QR.';
+  if (wallet.id === WALLETCONNECT_ID) return CONFIG.walletConnectProjectId ? 'Connect MetaMask, Trust Wallet, Coinbase Wallet and other EVM wallets by mobile deep link or QR.' : 'WalletConnect QR cannot open until VITE_WALLETCONNECT_PROJECT_ID is added in GitHub Actions Variables.';
   if (wallet.id === BROWSER_WALLET_ID) return installed ? 'Uses the currently active injected EVM provider.' : 'No injected EVM provider was detected in this browser.';
   if (installed) return `${wallet.subtitle}. Detected in this browser.`;
   if (isMobile() && wallet.mobileOpenUrl) return `${wallet.subtitle}. Opens the installed wallet app/browser on mobile.`;
