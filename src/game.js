@@ -225,6 +225,28 @@ export function createGame(canvas, callbacks = {}) {
     return { clean: true, status: 'Clean run', flags: [], requireGameOverBeforeMint: true };
   }
 
+  function isMilestoneAlreadyMinted(milestoneOrNumber) {
+    const milestoneNumber = typeof milestoneOrNumber === 'object'
+      ? Number(milestoneOrNumber?.milestone || 0)
+      : Number(milestoneOrNumber || 0);
+
+    if (!milestoneNumber) return false;
+
+    try {
+      return Boolean(callbacks.isMilestoneMinted?.(milestoneNumber));
+    } catch {
+      return false;
+    }
+  }
+
+  function shouldPreserveMintOnGameOver(snapshotValue = snapshot()) {
+    return Boolean(
+      snapshotValue?.mintAllowed &&
+      snapshotValue?.mintableMilestone &&
+      !isMilestoneAlreadyMinted(snapshotValue.mintableMilestone)
+    );
+  }
+
   function validateMint(milestoneNumber) {
     const milestone = STAGE_CONFIG.find((m) => m.milestone === Number(milestoneNumber));
     const playSeconds = getPlaySeconds();
@@ -334,8 +356,11 @@ export function createGame(canvas, callbacks = {}) {
   function canJumpStartNewRun() {
     if (state.running) return true;
     if (!state.startedAt) return true;
-    if (state.startLockedByMintableNft || snapshot().mintAllowed) return false;
-    return true;
+
+    // Only freeze accidental restart when the currently unlocked NFT is still unminted.
+    // If the current milestone NFT was already minted before, Space/tap can start a new run normally.
+    if (state.startLockedByMintableNft) return false;
+    return !shouldPreserveMintOnGameOver(snapshot());
   }
 
   function jump() {
@@ -424,9 +449,7 @@ export function createGame(canvas, callbacks = {}) {
     }
 
     const finalSnapshot = snapshot();
-    if (finalSnapshot.mintAllowed) {
-      state.startLockedByMintableNft = true;
-    }
+    state.startLockedByMintableNft = shouldPreserveMintOnGameOver(finalSnapshot);
 
     playSound('gameOver', STAGE_CONFIG[state.stageIndex]);
     callbacks.onGameOver?.(snapshot());
@@ -665,7 +688,8 @@ export function createGame(canvas, callbacks = {}) {
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
       ctx.font = '800 27px system-ui, sans-serif';
-      const locked = state.startLockedByMintableNft || snapshot().mintAllowed;
+      const currentSnapshot = snapshot();
+      const locked = state.startLockedByMintableNft || shouldPreserveMintOnGameOver(currentSnapshot);
       ctx.fillText(locked ? 'NFT ready — mint is preserved' : 'Press Space / Tap to Start', width / 2, height / 2 - 14);
       ctx.font = '15px system-ui, sans-serif';
       ctx.fillStyle = '#cbd5e1';
@@ -743,7 +767,18 @@ export function createGame(canvas, callbacks = {}) {
   window.addEventListener('resize', resize);
   window.addEventListener('keydown', onKeyDown);
   document.addEventListener('visibilitychange', onVisibilityChange);
-  canvas.addEventListener('pointerdown', jump);
+  function isCoarsePointerInput() {
+    return Boolean(window.matchMedia?.('(pointer: coarse)').matches);
+  }
+
+  function onCanvasPointerDown() {
+    // Desktop/laptop canvas click still jumps.
+    // Mobile jump is handled globally in main.js so the whole page can act as jump space,
+    // excluding wallet, start, sound and mint controls.
+    if (!isCoarsePointerInput()) jump();
+  }
+
+  canvas.addEventListener('pointerdown', onCanvasPointerDown);
   animationFrameId = requestAnimationFrame((t) => {
     state.lastTime = t;
     animationFrameId = requestAnimationFrame(loop);
@@ -762,7 +797,7 @@ export function createGame(canvas, callbacks = {}) {
       window.removeEventListener('resize', resize);
       window.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      canvas.removeEventListener('pointerdown', jump);
+      canvas.removeEventListener('pointerdown', onCanvasPointerDown);
     },
   };
 }
