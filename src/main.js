@@ -1,5 +1,5 @@
 import './style.css';
-import { CONFIG } from './config.js';
+import { CONFIG, NETWORKS } from './config.js';
 import { createGame, STAGE_CONFIG } from './game.js';
 import {
   disconnectWallet,
@@ -90,10 +90,10 @@ app.innerHTML = `
   <main class="shell">
     <section class="hero-card" aria-labelledby="app-title">
       <div class="hero-copy">
-        <p class="eyebrow">Base Mainnet • ERC-721 Runner</p>
+        <p class="eyebrow">Multi Chain • ERC-721 Runner</p>
         <h1 id="app-title"><span>Base Quest</span><span>Milestones</span></h1>
         <p class="hero-text">
-          Play a clean run, unlock a milestone, then mint the matching NFT on Base.
+          Play a clean run, unlock a milestone, then mint the matching NFT on the selected network.
           The wallet picker is EVM-only and supports desktop extensions plus mobile WalletConnect.
         </p>
 
@@ -103,7 +103,7 @@ app.innerHTML = `
         </div>
 
         <p id="walletStatus" class="status-text">
-          Live on Base Mainnet. Connect an EVM wallet to mint unlocked milestones.
+          Connect an EVM wallet to mint unlocked milestones.
         </p>
       </div>
 
@@ -112,7 +112,7 @@ app.innerHTML = `
         <span class="orb orb-two"></span>
         <div class="chain-card">
           <span>Network</span>
-          <strong>Base</strong>
+          <strong id="networkName">Base</strong>
         </div>
         <div class="chain-card muted">
           <span>Mint Type</span>
@@ -232,6 +232,7 @@ const mintBtn = $('#mintBtn');
 const connectBtn = $('#connectBtn');
 const disconnectBtn = $('#disconnectBtn');
 const walletStatus = $('#walletStatus');
+const networkNameEl = $('#networkName');
 const soundBtn = $('#soundBtn');
 const antiCheatEl = $('#antiCheat');
 
@@ -410,7 +411,7 @@ async function refreshWalletUi() {
   updateWalletButtons();
 
   if (!walletState.account) {
-    walletStatus.textContent = 'Live on Base Mainnet. Connect an EVM wallet. On mobile, MetaMask/Trust opens the wallet app; WalletConnect keeps this page open.';
+    walletStatus.textContent = `Live on ${CONFIG.chainName}. Connect an EVM wallet. On mobile, MetaMask/Trust opens the wallet app; WalletConnect keeps this page open.`;
     updateStats(lastSnapshot || game.snapshot());
     return;
   }
@@ -421,6 +422,7 @@ async function refreshWalletUi() {
     const balance = await getBalanceText();
     const name = walletState.walletName || walletState.connectionType || 'Wallet';
     const networkLabel = walletState.chainOk ? CONFIG.chainName : `wrong network - switch to ${CONFIG.chainName}`;
+    if (networkNameEl) networkNameEl.textContent = CONFIG.chainName;
     walletStatus.textContent = `${name} connected on ${networkLabel} • ${shortAddress(walletState.account)} • ${balance}`;
   } catch {
     walletStatus.textContent = `${CONFIG.chainName} connected • ${shortAddress(walletState.account)}`;
