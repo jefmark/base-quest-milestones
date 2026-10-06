@@ -1,6 +1,6 @@
 {
   "name": "Onchain Legend #6",
-  "description": "A true legend of Base. Your name is now written onchain forever.",
+  "description": "The highest Base Quest achievement, representing mastery, dedication, and verified onchain progression.",
   "image": "https://jefmark.github.io/base-quest-milestones/nft/6.png",
   "external_url": "https://jefmark.github.io/base-quest-milestones/",
   "attributes": [
@@ -9,7 +9,15 @@
       "value": "6"
     },
     {
-      "trait_type": "Title",
+      "trait_type": "Achievement Type",
+      "value": "Gameplay Milestone"
+    },
+    {
+      "trait_type": "Network Compatibility",
+      "value": "EVM Multichain"
+    },
+    {
+      "trait_type": "Skill",
       "value": "Legend"
     },
     {
@@ -18,7 +26,7 @@
     },
     {
       "trait_type": "World",
-      "value": "Base Quest"
+      "value": "Base Quest Ecosystem"
     }
   ]
 }
