@@ -1,34 +1,33 @@
-require("dotenv").config();
-require("@nomicfoundation/hardhat-ethers");
+require(“dotenv”).config(); require(“@nomicfoundation/hardhat-ethers”);
 
-const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY || "";
+const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY || ““;
 const accounts = DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [];
 
-/** @type import('hardhat/config').HardhatUserConfig */
-module.exports = {
-  solidity: {
-    version: "0.8.24",
-    settings: {
-      optimizer: { enabled: true, runs: 200 }
-    }
-  },
-  networks: {
-    baseSepolia: {
-      url: "https://sepolia.base.org",
-      chainId: 84532,
-      accounts
-    },
+/** @type import(‘hardhat/config’).HardhatUserConfig */ module.exports =
+{ solidity: { version: “0.8.24”, settings: { optimizer: { enabled: true,
+runs: 200 } } },
+
+networks: { baseSepolia: { url: “https://sepolia.base.org”, chainId:
+84532, accounts },
+
     baseMainnet: {
       url: "https://mainnet.base.org",
       chainId: 8453,
       accounts
-    }
-  },
-  etherscan: {
-    apiKey: {
-      baseSepolia: process.env.BASESCAN_API_KEY || "",
-      baseMainnet: process.env.BASESCAN_API_KEY || ""
     },
+
+    botMainnet: {
+      url: process.env.BOT_RPC_URL || "",
+      chainId: 677,
+      accounts
+    }
+
+},
+
+etherscan: { apiKey: { baseSepolia: process.env.BASESCAN_API_KEY || ““,
+baseMainnet: process.env.BASESCAN_API_KEY ||”“, botMainnet:
+process.env.BOTSCAN_API_KEY ||”” },
+
     customChains: [
       {
         network: "baseSepolia",
@@ -38,6 +37,7 @@ module.exports = {
           browserURL: "https://sepolia.basescan.org"
         }
       },
+
       {
         network: "baseMainnet",
         chainId: 8453,
@@ -45,7 +45,16 @@ module.exports = {
           apiURL: "https://api.basescan.org/api",
           browserURL: "https://basescan.org"
         }
+      },
+
+      {
+        network: "botMainnet",
+        chainId: 677,
+        urls: {
+          apiURL: process.env.BOTSCAN_API_URL || "",
+          browserURL: process.env.BOTSCAN_BROWSER_URL || ""
+        }
       }
     ]
-  }
-};
+
+} };
