@@ -1,234 +1,146 @@
-export const STAGE_CONFIG = [
-  { milestone: 1, name: 'Rookie Runner', score: 1200, minPlaySeconds: 20, speed: 5.4 },
-  { milestone: 2, name: 'Chain Jumper', score: 5000, minPlaySeconds: 45, speed: 6.2 },
-  { milestone: 3, name: 'Base Sprinter', score: 10000, minPlaySeconds: 70, speed: 7.0 },
-  { milestone: 4, name: 'Gasless Ghost', score: 18000, minPlaySeconds: 95, speed: 7.9 },
-  { milestone: 5, name: 'Block Master', score: 30000, minPlaySeconds: 125, speed: 8.9 },
-  { milestone: 6, name: 'Onchain Legend', score: 45000, minPlaySeconds: 160, speed: 10.0 },
-];
+export const STAGE_CONFIG = [ { milestone: 1, name: ‘Rookie Runner’,
+score: 1200, minPlaySeconds: 20, speed: 5.4 }, { milestone: 2, name:
+‘Chain Jumper’, score: 2600, minPlaySeconds: 35, speed: 6.2 }, {
+milestone: 3, name: ‘Base Sprinter’, score: 4500, minPlaySeconds: 50,
+speed: 7.0 }, { milestone: 4, name: ‘Gasless Ghost’, score: 7000,
+minPlaySeconds: 70, speed: 7.9 }, { milestone: 5, name: ‘Block Master’,
+score: 10000, minPlaySeconds: 90, speed: 8.9 }, { milestone: 6, name:
+‘Onchain Legend’, score: 13500, minPlaySeconds: 110, speed: 10.0 },];
 
-export const PENALTY_CONFIG = [
-  { label: '0-20s', until: 20, penalty: 100 },
-  { label: '20-45s', until: 45, penalty: 250 },
-  { label: '45-70s', until: 70, penalty: 500 },
-  { label: '70-95s', until: 95, penalty: 850 },
-  { label: '95-125s', until: 125, penalty: 1300 },
-  { label: '125-160s', until: 160, penalty: 2000 },
-  { label: '160s+', until: Number.POSITIVE_INFINITY, penalty: 3000 },
-];
+export const PENALTY_CONFIG = [ { label: ‘0-20s’, until: 20, penalty:
+100 }, { label: ‘20-45s’, until: 45, penalty: 250 }, { label: ‘45-70s’,
+until: 70, penalty: 500 }, { label: ‘70-95s’, until: 95, penalty: 850 },
+{ label: ‘95-125s’, until: 125, penalty: 1300 }, { label: ‘125-160s’,
+until: 160, penalty: 2000 }, { label: ‘160s+’, until:
+Number.POSITIVE_INFINITY, penalty: 3000 },];
 
-const SCORE_RATE_MULTIPLIER = 0.25;
-const OBSTACLE_PASS_SCORE = 15;
-const ORB_SCORE = 35;
-const STORAGE_KEY = 'baseQuestBest';
-const SOUND_KEY = 'baseQuestSound';
+const SCORE_RATE_MULTIPLIER = 0.25; const OBSTACLE_PASS_SCORE = 15;
+const ORB_SCORE = 35; const STORAGE_KEY = ‘baseQuestBest’; const
+SOUND_KEY = ‘baseQuestSound’;
 
-const ANTI_CHEAT_CONFIG = {
-  requireGameOverBeforeMint: true,
-  invalidateOnTabHidden: true,
-  maxFrameGapMs: 1800,
-  maxWallPerformanceDriftMs: 3000,
-  maxScorePerSecond: 540,
-  maxJumpInputsPerSecond: 20,
-  maxMintRunSeconds: 900,
-  maxLedgerDifference: 3,
-};
+const ANTI_CHEAT_CONFIG = { requireGameOverBeforeMint: true,
+invalidateOnTabHidden: true, maxFrameGapMs: 1800,
+maxWallPerformanceDriftMs: 3000, maxScorePerSecond: 540,
+maxJumpInputsPerSecond: 20, maxMintRunSeconds: 900, maxLedgerDifference:
+3, };
 
 const safeRandom = (min, max) => Math.random() * (max - min) + min;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
-function makeRunId() {
-  const bytes = new Uint32Array(2);
-  if (window.crypto?.getRandomValues) {
-    window.crypto.getRandomValues(bytes);
-    return `${bytes[0].toString(16)}-${bytes[1].toString(16)}`;
-  }
-  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
+function makeRunId() { const bytes = new Uint32Array(2); if
+(window.crypto?.getRandomValues) { window.crypto.getRandomValues(bytes);
+return ${bytes[0].toString(16)}-${bytes[1].toString(16)}; } return
+${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}; }
+
+let audioCtx = null; let soundEnabled = localStorage.getItem(SOUND_KEY)
+!== ‘off’;
+
+function getAudioCtx() { if (!soundEnabled) return null; const
+AudioContextClass = window.AudioContext || window.webkitAudioContext; if
+(!AudioContextClass) return null; if (!audioCtx) audioCtx = new
+AudioContextClass(); if (audioCtx.state === ‘suspended’)
+audioCtx.resume().catch(() => {}); return audioCtx; }
+
+function tone({ frequency = 440, endFrequency = null, delay = 0,
+duration = 0.16, volume = 0.03, type = ‘sine’ }) { const ctx =
+getAudioCtx(); if (!ctx) return; const start = ctx.currentTime + delay;
+const osc = ctx.createOscillator(); const gain = ctx.createGain();
+osc.type = type; osc.frequency.setValueAtTime(frequency, start); if
+(endFrequency) osc.frequency.exponentialRampToValueAtTime(Math.max(20,
+endFrequency), start + duration); gain.gain.setValueAtTime(0.0001,
+start); gain.gain.linearRampToValueAtTime(volume, start + 0.025);
+gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+osc.connect(gain); gain.connect(ctx.destination); osc.start(start);
+osc.stop(start + duration + 0.04); }
+
+function playSound(kind, stage = null) { if (!soundEnabled) return; if
+(kind === ‘jump’) { tone({ frequency: 230, endFrequency: 360, duration:
+0.16 }); tone({ frequency: 520, delay: 0.035, duration: 0.11, volume:
+0.018, type: ‘triangle’ }); } if (kind === ‘orb’) { tone({ frequency:
+540, duration: 0.12, volume: 0.028 }); tone({ frequency: 760, delay:
+0.08, duration: 0.14, volume: 0.024 }); } if (kind === ‘protectedHit’) {
+tone({ frequency: 150, endFrequency: 92, duration: 0.2, volume: 0.045,
+type: ‘triangle’ }); } if (kind === ‘gameOver’) { const root = [174,
+196, 220, 247, 277, 311][Math.max(0, Math.min(5, Number(stage?.milestone
+|| 1) - 1))]; tone({ frequency: root * 1.25, endFrequency: root,
+duration: 0.22 }); tone({ frequency: root, endFrequency: root * 0.72,
+delay: 0.18, duration: 0.24, volume: 0.026, type: ‘triangle’ }); } }
+
+export function getPenaltyForSeconds(seconds) { return
+PENALTY_CONFIG.find((row) => seconds < row.until) ||
+PENALTY_CONFIG[PENALTY_CONFIG.length - 1]; }
+
+function createIntegrityState() { return { runId: makeRunId(),
+perfStart: 0, perfEnd: 0, wallStart: 0, wallEnd: 0, scoreLedger: 0,
+invalidated: false, flags: [], actionWindowStartedAt: 0,
+jumpInputsInWindow: 0, }; }
+
+export function createGame(canvas, callbacks = {}) { const ctx =
+canvas.getContext(‘2d’);
+
+const state = { running: false, paused: false, startedAt: 0, endedAt: 0,
+lastTime: 0, score: 0, best: Number(localStorage.getItem(STORAGE_KEY) ||
+0), stageIndex: 0, milestoneUnlocked: 0, distance: 0, shake: 0,
+lastPenalty: 0, obstacles: [], orbs: [], particles: [], damageTexts: [],
+player: { x: 90, y: 0, w: 34, h: 42, vy: 0, grounded: false, shield: 0
+}, integrity: createIntegrityState(), startLockedByMintableNft: false,
+};
+
+let obstacleTimer = 0; let orbTimer = 0; let animationFrameId = 0;
+
+function resize() { const dpr = Math.min(window.devicePixelRatio || 1,
+2); const rect = canvas.getBoundingClientRect(); canvas.width =
+Math.floor(rect.width * dpr); canvas.height = Math.floor(rect.height *
+dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); if (!state.running &&
+!state.startedAt) { state.player.y = groundY() - state.player.h; } }
+
+function groundY() { return canvas.getBoundingClientRect().height - 72;
 }
 
-let audioCtx = null;
-let soundEnabled = localStorage.getItem(SOUND_KEY) !== 'off';
+function addScore(amount) { const before = state.score; state.score =
+Math.max(0, state.score + amount); const actualDelta = state.score -
+before; state.integrity.scoreLedger = Math.max(0,
+state.integrity.scoreLedger + actualDelta); return actualDelta; }
 
-function getAudioCtx() {
-  if (!soundEnabled) return null;
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) return null;
-  if (!audioCtx) audioCtx = new AudioContextClass();
-  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-  return audioCtx;
+function flagCheat(code, detail) { if
+(!state.integrity.flags.some((flag) => flag.code === code)) {
+state.integrity.flags.push({ code, detail }); }
+state.integrity.invalidated = true; callbacks.onCheatFlag?.(snapshot(),
+code, detail); }
+
+function getPlaySeconds() { if (!state.startedAt) return 0; const
+endTime = !state.running && state.endedAt ? state.endedAt :
+performance.now(); return Math.max(0, Math.floor((endTime -
+state.startedAt) / 1000)); }
+
+function getHighestScoreMilestone() { let unlocked = null; for (const m
+of STAGE_CONFIG) { if (state.score >= m.score) unlocked = m; } return
+unlocked; }
+
+function getMintableMilestone() { const seconds = getPlaySeconds(); let
+mintable = null; for (const m of STAGE_CONFIG) { if (state.score >=
+m.score && seconds >= m.minPlaySeconds) mintable = m; } return mintable;
 }
 
-function tone({ frequency = 440, endFrequency = null, delay = 0, duration = 0.16, volume = 0.03, type = 'sine' }) {
-  const ctx = getAudioCtx();
-  if (!ctx) return;
-  const start = ctx.currentTime + delay;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(frequency, start);
-  if (endFrequency) osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFrequency), start + duration);
-  gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.linearRampToValueAtTime(volume, start + 0.025);
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start(start);
-  osc.stop(start + duration + 0.04);
-}
+function getNextRequirement() { const seconds = getPlaySeconds(); for
+(const m of STAGE_CONFIG) { if (state.score < m.score || seconds <
+m.minPlaySeconds) { return { …m, remainingScore: Math.max(0,
+Math.ceil(m.score - state.score)), remainingSeconds: Math.max(0,
+m.minPlaySeconds - seconds), }; } } return null; }
 
-function playSound(kind, stage = null) {
-  if (!soundEnabled) return;
-  if (kind === 'jump') {
-    tone({ frequency: 230, endFrequency: 360, duration: 0.16 });
-    tone({ frequency: 520, delay: 0.035, duration: 0.11, volume: 0.018, type: 'triangle' });
-  }
-  if (kind === 'orb') {
-    tone({ frequency: 540, duration: 0.12, volume: 0.028 });
-    tone({ frequency: 760, delay: 0.08, duration: 0.14, volume: 0.024 });
-  }
-  if (kind === 'protectedHit') {
-    tone({ frequency: 150, endFrequency: 92, duration: 0.2, volume: 0.045, type: 'triangle' });
-  }
-  if (kind === 'gameOver') {
-    const root = [174, 196, 220, 247, 277, 311][Math.max(0, Math.min(5, Number(stage?.milestone || 1) - 1))];
-    tone({ frequency: root * 1.25, endFrequency: root, duration: 0.22 });
-    tone({ frequency: root, endFrequency: root * 0.72, delay: 0.18, duration: 0.24, volume: 0.026, type: 'triangle' });
-  }
-}
+function antiCheatSummary() { if (!state.startedAt) { return { clean:
+true, status: ‘Not started’, flags: [], requireGameOverBeforeMint: true
+}; } if (state.integrity.invalidated) { return { clean: false, status:
+‘Run invalidated. Restart required.’, flags: state.integrity.flags,
+requireGameOverBeforeMint: true }; } if (state.startLockedByMintableNft)
+{ return { clean: true, status: ‘Clean run. Mint is preserved.’, flags:
+[], requireGameOverBeforeMint: true }; } return { clean: true, status:
+‘Clean run’, flags: [], requireGameOverBeforeMint: true }; }
 
-export function getPenaltyForSeconds(seconds) {
-  return PENALTY_CONFIG.find((row) => seconds < row.until) || PENALTY_CONFIG[PENALTY_CONFIG.length - 1];
-}
-
-function createIntegrityState() {
-  return {
-    runId: makeRunId(),
-    perfStart: 0,
-    perfEnd: 0,
-    wallStart: 0,
-    wallEnd: 0,
-    scoreLedger: 0,
-    invalidated: false,
-    flags: [],
-    actionWindowStartedAt: 0,
-    jumpInputsInWindow: 0,
-  };
-}
-
-export function createGame(canvas, callbacks = {}) {
-  const ctx = canvas.getContext('2d');
-
-  const state = {
-    running: false,
-    paused: false,
-    startedAt: 0,
-    endedAt: 0,
-    lastTime: 0,
-    score: 0,
-    best: Number(localStorage.getItem(STORAGE_KEY) || 0),
-    stageIndex: 0,
-    milestoneUnlocked: 0,
-    distance: 0,
-    shake: 0,
-    lastPenalty: 0,
-    obstacles: [],
-    orbs: [],
-    particles: [],
-    damageTexts: [],
-    player: { x: 90, y: 0, w: 34, h: 42, vy: 0, grounded: false, shield: 0 },
-    integrity: createIntegrityState(),
-    startLockedByMintableNft: false,
-  };
-
-  let obstacleTimer = 0;
-  let orbTimer = 0;
-  let animationFrameId = 0;
-
-  function resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = Math.floor(rect.width * dpr);
-    canvas.height = Math.floor(rect.height * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (!state.running && !state.startedAt) {
-      state.player.y = groundY() - state.player.h;
-    }
-  }
-
-  function groundY() {
-    return canvas.getBoundingClientRect().height - 72;
-  }
-
-  function addScore(amount) {
-    const before = state.score;
-    state.score = Math.max(0, state.score + amount);
-    const actualDelta = state.score - before;
-    state.integrity.scoreLedger = Math.max(0, state.integrity.scoreLedger + actualDelta);
-    return actualDelta;
-  }
-
-  function flagCheat(code, detail) {
-    if (!state.integrity.flags.some((flag) => flag.code === code)) {
-      state.integrity.flags.push({ code, detail });
-    }
-    state.integrity.invalidated = true;
-    callbacks.onCheatFlag?.(snapshot(), code, detail);
-  }
-
-  function getPlaySeconds() {
-    if (!state.startedAt) return 0;
-    const endTime = !state.running && state.endedAt ? state.endedAt : performance.now();
-    return Math.max(0, Math.floor((endTime - state.startedAt) / 1000));
-  }
-
-  function getHighestScoreMilestone() {
-    let unlocked = null;
-    for (const m of STAGE_CONFIG) {
-      if (state.score >= m.score) unlocked = m;
-    }
-    return unlocked;
-  }
-
-  function getMintableMilestone() {
-    const seconds = getPlaySeconds();
-    let mintable = null;
-    for (const m of STAGE_CONFIG) {
-      if (state.score >= m.score && seconds >= m.minPlaySeconds) mintable = m;
-    }
-    return mintable;
-  }
-
-  function getNextRequirement() {
-    const seconds = getPlaySeconds();
-    for (const m of STAGE_CONFIG) {
-      if (state.score < m.score || seconds < m.minPlaySeconds) {
-        return {
-          ...m,
-          remainingScore: Math.max(0, Math.ceil(m.score - state.score)),
-          remainingSeconds: Math.max(0, m.minPlaySeconds - seconds),
-        };
-      }
-    }
-    return null;
-  }
-
-  function antiCheatSummary() {
-    if (!state.startedAt) {
-      return { clean: true, status: 'Not started', flags: [], requireGameOverBeforeMint: true };
-    }
-    if (state.integrity.invalidated) {
-      return { clean: false, status: 'Run invalidated. Restart required.', flags: state.integrity.flags, requireGameOverBeforeMint: true };
-    }
-    if (state.startLockedByMintableNft) {
-      return { clean: true, status: 'Clean run. Mint is preserved.', flags: [], requireGameOverBeforeMint: true };
-    }
-    return { clean: true, status: 'Clean run', flags: [], requireGameOverBeforeMint: true };
-  }
-
-  function isMilestoneAlreadyMinted(milestoneOrNumber) {
-    const milestoneNumber = typeof milestoneOrNumber === 'object'
-      ? Number(milestoneOrNumber?.milestone || 0)
-      : Number(milestoneOrNumber || 0);
+function isMilestoneAlreadyMinted(milestoneOrNumber) { const
+milestoneNumber = typeof milestoneOrNumber === ‘object’ ?
+Number(milestoneOrNumber?.milestone || 0) : Number(milestoneOrNumber ||
+0);
 
     if (!milestoneNumber) return false;
 
@@ -237,20 +149,17 @@ export function createGame(canvas, callbacks = {}) {
     } catch {
       return false;
     }
-  }
 
-  function shouldPreserveMintOnGameOver(snapshotValue = snapshot()) {
-    return Boolean(
-      snapshotValue?.mintAllowed &&
-      snapshotValue?.mintableMilestone &&
-      !isMilestoneAlreadyMinted(snapshotValue.mintableMilestone)
-    );
-  }
+}
 
-  function validateMint(milestoneNumber) {
-    const milestone = STAGE_CONFIG.find((m) => m.milestone === Number(milestoneNumber));
-    const playSeconds = getPlaySeconds();
-    const score = Math.floor(state.score);
+function shouldPreserveMintOnGameOver(snapshotValue = snapshot()) {
+return Boolean( snapshotValue?.mintAllowed &&
+snapshotValue?.mintableMilestone &&
+!isMilestoneAlreadyMinted(snapshotValue.mintableMilestone) ); }
+
+function validateMint(milestoneNumber) { const milestone =
+STAGE_CONFIG.find((m) => m.milestone === Number(milestoneNumber)); const
+playSeconds = getPlaySeconds(); const score = Math.floor(state.score);
 
     if (!milestone) return { ok: false, message: 'Invalid milestone.', milestone: null };
     if (!state.startedAt) return { ok: false, message: 'Start a new run first.', milestone };
@@ -283,14 +192,15 @@ export function createGame(canvas, callbacks = {}) {
     }
 
     return { ok: true, message: 'Mint payload is valid.', milestone, score, playSeconds, runId: state.integrity.runId };
-  }
 
-  function snapshot() {
-    const playSeconds = getPlaySeconds();
-    const scoreUnlocked = getHighestScoreMilestone();
-    const mintable = getMintableMilestone();
-    const validation = mintable ? validateMint(mintable.milestone) : { ok: false, message: 'No milestone is mintable yet.' };
-    const penaltyWindow = getPenaltyForSeconds(playSeconds);
+}
+
+function snapshot() { const playSeconds = getPlaySeconds(); const
+scoreUnlocked = getHighestScoreMilestone(); const mintable =
+getMintableMilestone(); const validation = mintable ?
+validateMint(mintable.milestone) : { ok: false, message: ‘No milestone
+is mintable yet.’ }; const penaltyWindow =
+getPenaltyForSeconds(playSeconds);
 
     return {
       score: Math.floor(state.score),
@@ -311,66 +221,45 @@ export function createGame(canvas, callbacks = {}) {
       antiCheat: antiCheatSummary(),
       startLockedByMintableNft: state.startLockedByMintableNft,
     };
-  }
 
-  function reset() {
-    state.running = true;
-    state.paused = false;
-    state.startedAt = performance.now();
-    state.endedAt = 0;
-    state.lastTime = performance.now();
-    state.score = 0;
-    state.best = Number(localStorage.getItem(STORAGE_KEY) || 0);
-    state.stageIndex = 0;
-    state.milestoneUnlocked = 0;
-    state.distance = 0;
-    state.shake = 0;
-    state.lastPenalty = 0;
-    state.obstacles = [];
-    state.orbs = [];
-    state.particles = [];
-    state.damageTexts = [];
-    state.player = { x: 90, y: groundY() - 42, w: 34, h: 42, vy: 0, grounded: true, shield: 0 };
-    state.integrity = createIntegrityState();
-    state.integrity.perfStart = state.startedAt;
-    state.integrity.wallStart = Date.now();
-    state.integrity.actionWindowStartedAt = state.startedAt;
-    state.startLockedByMintableNft = false;
-    obstacleTimer = 0;
-    orbTimer = 32;
-    callbacks.onUpdate?.(snapshot());
-  }
+}
 
-  function recordJumpInput() {
-    const now = performance.now();
-    if (!state.integrity.actionWindowStartedAt || now - state.integrity.actionWindowStartedAt > 1000) {
-      state.integrity.actionWindowStartedAt = now;
-      state.integrity.jumpInputsInWindow = 0;
-    }
-    state.integrity.jumpInputsInWindow += 1;
-    if (state.integrity.jumpInputsInWindow > ANTI_CHEAT_CONFIG.maxJumpInputsPerSecond) {
-      flagCheat('TOO_MANY_INPUTS', 'Too many jump inputs in one second.');
-    }
-  }
+function reset() { state.running = true; state.paused = false;
+state.startedAt = performance.now(); state.endedAt = 0; state.lastTime =
+performance.now(); state.score = 0; state.best =
+Number(localStorage.getItem(STORAGE_KEY) || 0); state.stageIndex = 0;
+state.milestoneUnlocked = 0; state.distance = 0; state.shake = 0;
+state.lastPenalty = 0; state.obstacles = []; state.orbs = [];
+state.particles = []; state.damageTexts = []; state.player = { x: 90, y:
+groundY() - 42, w: 34, h: 42, vy: 0, grounded: true, shield: 0 };
+state.integrity = createIntegrityState(); state.integrity.perfStart =
+state.startedAt; state.integrity.wallStart = Date.now();
+state.integrity.actionWindowStartedAt = state.startedAt;
+state.startLockedByMintableNft = false; obstacleTimer = 0; orbTimer =
+32; callbacks.onUpdate?.(snapshot()); }
 
-  function canJumpStartNewRun() {
-    if (state.running) return true;
-    if (!state.startedAt) return true;
+function recordJumpInput() { const now = performance.now(); if
+(!state.integrity.actionWindowStartedAt || now -
+state.integrity.actionWindowStartedAt > 1000) {
+state.integrity.actionWindowStartedAt = now;
+state.integrity.jumpInputsInWindow = 0; }
+state.integrity.jumpInputsInWindow += 1; if
+(state.integrity.jumpInputsInWindow >
+ANTI_CHEAT_CONFIG.maxJumpInputsPerSecond) { flagCheat(‘TOO_MANY_INPUTS’,
+‘Too many jump inputs in one second.’); } }
+
+function canJumpStartNewRun() { if (state.running) return true; if
+(!state.startedAt) return true;
 
     // Only freeze accidental restart when the currently unlocked NFT is still unminted.
     // If the current milestone NFT was already minted before, Space/tap can start a new run normally.
     if (state.startLockedByMintableNft) return false;
     return !shouldPreserveMintOnGameOver(snapshot());
-  }
 
-  function jump() {
-    if (!state.running) {
-      if (!canJumpStartNewRun()) {
-        callbacks.onUpdate?.(snapshot());
-        return;
-      }
-      reset();
-    }
+}
+
+function jump() { if (!state.running) { if (!canJumpStartNewRun()) {
+callbacks.onUpdate?.(snapshot()); return; } reset(); }
 
     recordJumpInput();
     if (state.integrity.invalidated) return;
@@ -381,67 +270,45 @@ export function createGame(canvas, callbacks = {}) {
       burst(state.player.x + 16, state.player.y + 36, 10, '#e0fbfc');
       playSound('jump');
     }
-  }
 
-  function burst(x, y, count = 12, color = '#e0fbfc') {
-    for (let i = 0; i < count; i += 1) {
-      state.particles.push({ x, y, vx: safeRandom(-3, 3), vy: safeRandom(-4, 2), life: safeRandom(18, 36), color });
-    }
-  }
+}
 
-  function showPenaltyText(amount) {
-    state.damageTexts.push({
-      text: `-${amount}`,
-      x: state.player.x + state.player.w / 2,
-      y: state.player.y + state.player.h / 2,
-      vx: safeRandom(-4, 4),
-      vy: safeRandom(-5.2, -3.2),
-      life: 72,
-      maxLife: 72,
-      size: safeRandom(20, 27),
-      rotation: safeRandom(-0.18, 0.18),
-    });
-  }
+function burst(x, y, count = 12, color = ‘#e0fbfc’) { for (let i = 0; i
+< count; i += 1) { state.particles.push({ x, y, vx: safeRandom(-3, 3),
+vy: safeRandom(-4, 2), life: safeRandom(18, 36), color }); } }
 
-  function applyProtectedHitPenalty() {
-    const row = getPenaltyForSeconds(getPlaySeconds());
-    const amount = row.penalty;
-    addScore(-amount);
-    state.lastPenalty = amount;
-    state.shake = 9;
-    showPenaltyText(amount);
-    playSound('protectedHit');
-    burst(state.player.x + 18, state.player.y + 20, 18, '#26d9d0');
-    callbacks.onPenalty?.(snapshot(), amount, row);
-  }
+function showPenaltyText(amount) { state.damageTexts.push({ text:
+-${amount}, x: state.player.x + state.player.w / 2, y: state.player.y +
+state.player.h / 2, vx: safeRandom(-4, 4), vy: safeRandom(-5.2, -3.2),
+life: 72, maxLife: 72, size: safeRandom(20, 27), rotation:
+safeRandom(-0.18, 0.18), }); }
 
-  function spawnObstacle() {
-    const h = safeRandom(28, 70);
-    state.obstacles.push({ x: canvas.getBoundingClientRect().width + 30, y: groundY() - h, w: safeRandom(26, 44), h, passed: false, hit: false });
-  }
+function applyProtectedHitPenalty() { const row =
+getPenaltyForSeconds(getPlaySeconds()); const amount = row.penalty;
+addScore(-amount); state.lastPenalty = amount; state.shake = 9;
+showPenaltyText(amount); playSound(‘protectedHit’);
+burst(state.player.x + 18, state.player.y + 20, 18, ‘#26d9d0’);
+callbacks.onPenalty?.(snapshot(), amount, row); }
 
-  function spawnOrb() {
-    state.orbs.push({ x: canvas.getBoundingClientRect().width + 30, y: safeRandom(groundY() - 165, groundY() - 76), r: 12, taken: false, pulse: 0 });
-  }
+function spawnObstacle() { const h = safeRandom(28, 70);
+state.obstacles.push({ x: canvas.getBoundingClientRect().width + 30, y:
+groundY() - h, w: safeRandom(26, 44), h, passed: false, hit: false }); }
 
-  function rectHit(a, b) {
-    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-  }
+function spawnOrb() { state.orbs.push({ x:
+canvas.getBoundingClientRect().width + 30, y: safeRandom(groundY() -
+165, groundY() - 76), r: 12, taken: false, pulse: 0 }); }
 
-  function orbHit(player, orb) {
-    const cx = clamp(orb.x, player.x, player.x + player.w);
-    const cy = clamp(orb.y, player.y, player.y + player.h);
-    const dx = orb.x - cx;
-    const dy = orb.y - cy;
-    return dx * dx + dy * dy < orb.r * orb.r;
-  }
+function rectHit(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x &&
+a.y < b.y + b.h && a.y + a.h > b.y; }
 
-  function endGame() {
-    state.endedAt = performance.now();
-    state.integrity.perfEnd = state.endedAt;
-    state.integrity.wallEnd = Date.now();
-    state.running = false;
-    state.shake = 18;
+function orbHit(player, orb) { const cx = clamp(orb.x, player.x,
+player.x + player.w); const cy = clamp(orb.y, player.y, player.y +
+player.h); const dx = orb.x - cx; const dy = orb.y - cy; return dx *
+dx + dy * dy < orb.r * orb.r; }
+
+function endGame() { state.endedAt = performance.now();
+state.integrity.perfEnd = state.endedAt; state.integrity.wallEnd =
+Date.now(); state.running = false; state.shake = 18;
 
     if (state.score > state.best) {
       state.best = state.score;
@@ -453,10 +320,10 @@ export function createGame(canvas, callbacks = {}) {
 
     playSound('gameOver', STAGE_CONFIG[state.stageIndex]);
     callbacks.onGameOver?.(snapshot());
-  }
 
-  function update(dt) {
-    if (!state.running || state.paused) return;
+}
+
+function update(dt) { if (!state.running || state.paused) return;
 
     const stage = STAGE_CONFIG[state.stageIndex];
     const speed = stage.speed + Math.min(4, state.distance / 5000);
@@ -543,26 +410,19 @@ export function createGame(canvas, callbacks = {}) {
     }
 
     callbacks.onUpdate?.(snapshot());
-  }
 
-  function drawRoundRect(x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
-  }
+}
 
-  function draw() {
-    const width = canvas.getBoundingClientRect().width;
-    const height = canvas.getBoundingClientRect().height;
-    const gy = groundY();
+function drawRoundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x +
+r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w,
+y + r); ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h,
+x + w - r, y + h); ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y +
+h, x, y + h - r); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x +
+r, y); ctx.closePath(); }
+
+function draw() { const width = canvas.getBoundingClientRect().width;
+const height = canvas.getBoundingClientRect().height; const gy =
+groundY();
 
     ctx.save();
     ctx.clearRect(0, 0, width, height);
@@ -711,93 +571,55 @@ export function createGame(canvas, callbacks = {}) {
       ctx.fillText('Run invalidated by anti-cheat. Restart to mint.', width / 2, 33);
       ctx.restore();
     }
-  }
 
-  function loop(now) {
-    const rawDeltaMs = now - state.lastTime;
-    if (state.running && rawDeltaMs > ANTI_CHEAT_CONFIG.maxFrameGapMs) {
-      flagCheat('FRAME_GAP', `Frame gap was ${Math.round(rawDeltaMs)}ms.`);
-    }
-    const dt = Math.min(2.2, rawDeltaMs / 16.67);
-    state.lastTime = now;
-    update(dt);
-    draw();
-    animationFrameId = requestAnimationFrame(loop);
-  }
-
-  function onKeyDown(event) {
-    if (['Space', 'ArrowUp', 'KeyW'].includes(event.code)) {
-      event.preventDefault();
-      jump();
-    }
-    if (event.code === 'KeyP') state.paused = !state.paused;
-  }
-
-  function onVisibilityChange() {
-    if (!state.running) return;
-    if (document.hidden && ANTI_CHEAT_CONFIG.invalidateOnTabHidden) {
-      flagCheat('TAB_HIDDEN', 'The tab was hidden during an active run.');
-      state.paused = true;
-    }
-  }
-
-  function getMintPayload(milestoneNumber) {
-    const validation = validateMint(milestoneNumber);
-    if (!validation.ok) throw new Error(validation.message);
-    return {
-      milestone: validation.milestone.milestone,
-      score: validation.score,
-      playSeconds: validation.playSeconds,
-      runId: validation.runId,
-    };
-  }
-
-  function setSoundEnabled(value) {
-    soundEnabled = Boolean(value);
-    localStorage.setItem(SOUND_KEY, soundEnabled ? 'on' : 'off');
-    if (!soundEnabled && audioCtx) audioCtx.suspend().catch(() => {});
-    if (soundEnabled) getAudioCtx();
-  }
-
-  function isSoundEnabled() {
-    return soundEnabled;
-  }
-
-  resize();
-  window.addEventListener('resize', resize);
-  window.addEventListener('keydown', onKeyDown);
-  document.addEventListener('visibilitychange', onVisibilityChange);
-  function isCoarsePointerInput() {
-    return Boolean(window.matchMedia?.('(pointer: coarse)').matches);
-  }
-
-  function onCanvasPointerDown() {
-    // Desktop/laptop canvas click still jumps.
-    // Mobile jump is handled globally in main.js so the whole page can act as jump space,
-    // excluding wallet, start, sound and mint controls.
-    if (!isCoarsePointerInput()) jump();
-  }
-
-  canvas.addEventListener('pointerdown', onCanvasPointerDown);
-  animationFrameId = requestAnimationFrame((t) => {
-    state.lastTime = t;
-    animationFrameId = requestAnimationFrame(loop);
-  });
-  draw();
-
-  return {
-    start: reset,
-    jump,
-    snapshot,
-    getMintPayload,
-    setSoundEnabled,
-    isSoundEnabled,
-    destroy() {
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener('resize', resize);
-      window.removeEventListener('keydown', onKeyDown);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-      canvas.removeEventListener('pointerdown', onCanvasPointerDown);
-    },
-  };
 }
+
+function loop(now) { const rawDeltaMs = now - state.lastTime; if
+(state.running && rawDeltaMs > ANTI_CHEAT_CONFIG.maxFrameGapMs) {
+flagCheat(‘FRAME_GAP’, Frame gap was ${Math.round(rawDeltaMs)}ms.); }
+const dt = Math.min(2.2, rawDeltaMs / 16.67); state.lastTime = now;
+update(dt); draw(); animationFrameId = requestAnimationFrame(loop); }
+
+function onKeyDown(event) { if ([‘Space’, ‘ArrowUp’,
+‘KeyW’].includes(event.code)) { event.preventDefault(); jump(); } if
+(event.code === ‘KeyP’) state.paused = !state.paused; }
+
+function onVisibilityChange() { if (!state.running) return; if
+(document.hidden && ANTI_CHEAT_CONFIG.invalidateOnTabHidden) {
+flagCheat(‘TAB_HIDDEN’, ‘The tab was hidden during an active run.’);
+state.paused = true; } }
+
+function getMintPayload(milestoneNumber) { const validation =
+validateMint(milestoneNumber); if (!validation.ok) throw new
+Error(validation.message); return { milestone:
+validation.milestone.milestone, score: validation.score, playSeconds:
+validation.playSeconds, runId: validation.runId, }; }
+
+function setSoundEnabled(value) { soundEnabled = Boolean(value);
+localStorage.setItem(SOUND_KEY, soundEnabled ? ‘on’ : ‘off’); if
+(!soundEnabled && audioCtx) audioCtx.suspend().catch(() => {}); if
+(soundEnabled) getAudioCtx(); }
+
+function isSoundEnabled() { return soundEnabled; }
+
+resize(); window.addEventListener(‘resize’, resize);
+window.addEventListener(‘keydown’, onKeyDown);
+document.addEventListener(‘visibilitychange’, onVisibilityChange);
+function isCoarsePointerInput() { return
+Boolean(window.matchMedia?.(‘(pointer: coarse)’).matches); }
+
+function onCanvasPointerDown() { // Desktop/laptop canvas click still
+jumps. // Mobile jump is handled globally in main.js so the whole page
+can act as jump space, // excluding wallet, start, sound and mint
+controls. if (!isCoarsePointerInput()) jump(); }
+
+canvas.addEventListener(‘pointerdown’, onCanvasPointerDown);
+animationFrameId = requestAnimationFrame((t) => { state.lastTime = t;
+animationFrameId = requestAnimationFrame(loop); }); draw();
+
+return { start: reset, jump, snapshot, getMintPayload, setSoundEnabled,
+isSoundEnabled, destroy() { cancelAnimationFrame(animationFrameId);
+window.removeEventListener(‘resize’, resize);
+window.removeEventListener(‘keydown’, onKeyDown);
+document.removeEventListener(‘visibilitychange’, onVisibilityChange);
+canvas.removeEventListener(‘pointerdown’, onCanvasPointerDown); }, }; }
