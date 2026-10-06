@@ -1,6 +1,6 @@
 {
   "name": "Rookie Runner #1",
-  "description": "A fresh runner enters the Base Quest world. Every legend starts from here.",
+  "description": "The first achievement in Base Quest. A verified milestone earned through skill, persistence, and onchain progression.",
   "image": "https://jefmark.github.io/base-quest-milestones/nft/1.png",
   "external_url": "https://jefmark.github.io/base-quest-milestones/",
   "attributes": [
@@ -9,7 +9,15 @@
       "value": "1"
     },
     {
-      "trait_type": "Rank",
+      "trait_type": "Achievement Type",
+      "value": "Gameplay Milestone"
+    },
+    {
+      "trait_type": "Network Compatibility",
+      "value": "EVM Multichain"
+    },
+    {
+      "trait_type": "Skill",
       "value": "Rookie"
     },
     {
@@ -18,7 +26,7 @@
     },
     {
       "trait_type": "World",
-      "value": "Base Quest"
+      "value": "Base Quest Ecosystem"
     }
   ]
 }
