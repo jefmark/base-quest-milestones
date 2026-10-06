@@ -11,7 +11,8 @@
     "compile": "hardhat compile",
     "test": "hardhat test",
     "deploy:base-sepolia": "hardhat run scripts/deploy.js --network baseSepolia",
-    "deploy:base-mainnet": "hardhat run scripts/deploy.js --network baseMainnet"
+    "deploy:base-mainnet": "hardhat run scripts/deploy.js --network baseMainnet",
+    "deploy:bot-mainnet": "hardhat run scripts/deploy.js --network botMainnet"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.2",
