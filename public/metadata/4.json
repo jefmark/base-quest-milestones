@@ -1,6 +1,6 @@
 {
   "name": "Gasless Ghost #4",
-  "description": "You move silently across the chain. No gas, no trace, just pure flow.",
+  "description": "An advanced milestone representing precision, stealth movement, and consistent gameplay performance.",
   "image": "https://jefmark.github.io/base-quest-milestones/nft/4.png",
   "external_url": "https://jefmark.github.io/base-quest-milestones/",
   "attributes": [
@@ -9,7 +9,15 @@
       "value": "4"
     },
     {
-      "trait_type": "Style",
+      "trait_type": "Achievement Type",
+      "value": "Gameplay Milestone"
+    },
+    {
+      "trait_type": "Network Compatibility",
+      "value": "EVM Multichain"
+    },
+    {
+      "trait_type": "Skill",
       "value": "Stealth"
     },
     {
@@ -18,7 +26,38 @@
     },
     {
       "trait_type": "World",
-      "value": "Base Quest"
+      "value": "Base Quest Ecosystem"
+    }
+  ]
+}{
+  "name": "Gasless Ghost #4",
+  "description": "An advanced milestone representing precision, stealth movement, and consistent gameplay performance.",
+  "image": "https://jefmark.github.io/base-quest-milestones/nft/4.png",
+  "external_url": "https://jefmark.github.io/base-quest-milestones/",
+  "attributes": [
+    {
+      "trait_type": "Milestone",
+      "value": "4"
+    },
+    {
+      "trait_type": "Achievement Type",
+      "value": "Gameplay Milestone"
+    },
+    {
+      "trait_type": "Network Compatibility",
+      "value": "EVM Multichain"
+    },
+    {
+      "trait_type": "Skill",
+      "value": "Stealth"
+    },
+    {
+      "trait_type": "Difficulty",
+      "value": "Medium-Hard"
+    },
+    {
+      "trait_type": "World",
+      "value": "Base Quest Ecosystem"
     }
   ]
 }
