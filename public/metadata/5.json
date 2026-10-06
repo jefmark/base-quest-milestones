@@ -1,12 +1,20 @@
 {
   "name": "Block Master #5",
-  "description": "You understand the rhythm of blocks. Every move is calculated.",
+  "description": "A high-level achievement for players who understand patterns, prediction, and advanced challenge mechanics.",
   "image": "https://jefmark.github.io/base-quest-milestones/nft/5.png",
   "external_url": "https://jefmark.github.io/base-quest-milestones/",
   "attributes": [
     {
       "trait_type": "Milestone",
       "value": "5"
+    },
+    {
+      "trait_type": "Achievement Type",
+      "value": "Gameplay Milestone"
+    },
+    {
+      "trait_type": "Network Compatibility",
+      "value": "EVM Multichain"
     },
     {
       "trait_type": "Skill",
@@ -18,7 +26,7 @@
     },
     {
       "trait_type": "World",
-      "value": "Base Quest"
+      "value": "Base Quest Ecosystem"
     }
   ]
 }
